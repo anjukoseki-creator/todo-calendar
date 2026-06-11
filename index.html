@@ -3,410 +3,812 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ToDoカレンダー</title>
+<meta name="theme-color" content="#3b82d9">
+<title>TantoList — ToDoカレンダー by 小関</title>
+<link rel="manifest" href="manifest.json">
 <style>
   :root {
-    --bg: #f6f7fb;
-    --card: #ffffff;
-    --text: #2b2d42;
-    --muted: #8d93a8;
-    --accent: #5b6cff;
-    --accent-light: #eef0ff;
-    --danger: #e85d75;
-    --danger-light: #fdecef;
+    --bg: #f4f6fa;
+    --card: #fff;
+    --text: #243047;
+    --muted: #8b93a7;
+    --accent: #3b82d9;
+    --accent-light: #e8f1fc;
+    --border: #e3e7ef;
+    --high: #e85d75; --high-bg: #fdecef;
+    --mid:  #f0a832; --mid-bg:  #fdf3e0;
+    --low:  #43a878; --low-bg:  #e6f5ee;
     --done: #9aa0b5;
-    --today: #fff4e0;
-    --border: #e6e8f0;
-    --shadow: 0 2px 12px rgba(43,45,66,.08);
+    --today-bg: #fff7e8;
+    --shadow: 0 2px 10px rgba(36,48,71,.08);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, system-ui, sans-serif;
-    background: var(--bg); color: var(--text); min-height: 100vh;
-  }
-  header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 20px; background: var(--card); box-shadow: var(--shadow);
-    position: sticky; top: 0; z-index: 10;
-  }
-  header h1 { font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
-  header h1 .logo { font-size: 1.3rem; }
-  .header-actions { display: flex; gap: 8px; align-items: center; }
-  button {
-    font-family: inherit; cursor: pointer; border: none; border-radius: 8px;
-    font-size: .85rem; transition: opacity .15s, background .15s;
-  }
-  button:hover { opacity: .85; }
-  .btn-ghost { background: transparent; color: var(--muted); padding: 6px 10px; border: 1px solid var(--border); }
-  .btn-accent { background: var(--accent); color: #fff; padding: 8px 14px; }
-  .overdue-badge {
-    background: var(--danger); color: #fff; border-radius: 999px;
-    padding: 4px 10px; font-size: .75rem; display: none;
-  }
-  main { max-width: 1100px; margin: 20px auto; padding: 0 16px; display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  body { font-family: "Hiragino Kaku Gothic ProN","Hiragino Sans",Meiryo,system-ui,sans-serif; background: var(--bg); color: var(--text); }
+  button { font-family: inherit; cursor: pointer; border: none; border-radius: 8px; font-size: .82rem; }
+  button:hover { opacity: .88; }
+  input, select, textarea { font-family: inherit; font-size: .85rem; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); }
 
-  /* カレンダー */
-  .calendar-card { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 16px; }
-  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .cal-nav h2 { font-size: 1.15rem; }
-  .cal-nav .nav-btns { display: flex; gap: 6px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px; background: var(--card); box-shadow: var(--shadow); position: sticky; top: 0; z-index: 20; flex-wrap: wrap; }
+  header h1 { font-size: 1.05rem; display: flex; align-items: center; gap: 7px; }
+  header h1 small { font-size: .68rem; color: var(--muted); font-weight: normal; }
+  .hdr-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 6px 10px; }
+  .btn-accent { background: var(--accent); color: #fff; padding: 8px 14px; }
+  .view-switch { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .view-switch button { border-radius: 0; padding: 6px 14px; background: #fff; color: var(--muted); }
+  .view-switch button.active { background: var(--accent); color: #fff; }
+  .overdue-badge { background: var(--high); color: #fff; border-radius: 999px; padding: 4px 10px; font-size: .72rem; display: none; }
+
+  main { max-width: 1200px; margin: 16px auto; padding: 0 14px; display: grid; grid-template-columns: 1fr 330px; gap: 14px; align-items: start; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; }
+  .card h3 { font-size: .9rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .side { display: flex; flex-direction: column; gap: 14px; }
+
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-nav h2 { font-size: 1.05rem; }
   .nav-btns button { background: var(--accent-light); color: var(--accent); padding: 6px 12px; font-weight: bold; }
+
+  /* 月表示 */
   table.calendar { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .calendar th { font-size: .75rem; color: var(--muted); padding: 6px 0; font-weight: normal; }
-  .calendar th.sun { color: var(--danger); }
-  .calendar th.sat { color: var(--accent); }
-  .calendar td {
-    border: 1px solid var(--border); vertical-align: top; height: 88px;
-    padding: 4px; cursor: pointer; transition: background .15s;
-  }
+  .calendar th { font-size: .72rem; color: var(--muted); padding: 5px 0; font-weight: normal; }
+  .calendar th.sun { color: var(--high); } .calendar th.sat { color: var(--accent); }
+  .calendar td { border: 1px solid var(--border); vertical-align: top; height: 86px; padding: 3px; cursor: pointer; }
   .calendar td:hover { background: var(--accent-light); }
   .calendar td.other { background: #fafbfd; color: #c4c8d8; }
-  .calendar td.today { background: var(--today); }
+  .calendar td.today { background: var(--today-bg); }
   .calendar td.selected { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .day-num { font-size: .8rem; font-weight: bold; }
-  td.sun-cell .day-num { color: var(--danger); }
-  td.sat-cell .day-num { color: var(--accent); }
+  .day-num { font-size: .78rem; font-weight: bold; }
+  td.sun-cell .day-num { color: var(--high); } td.sat-cell .day-num { color: var(--accent); }
   .cell-todos { margin-top: 2px; display: flex; flex-direction: column; gap: 2px; }
-  .chip {
-    font-size: .65rem; padding: 1px 5px; border-radius: 4px;
-    background: var(--accent-light); color: var(--accent);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .chip.done { background: #f0f1f5; color: var(--done); text-decoration: line-through; }
-  .chip.overdue { background: var(--danger-light); color: var(--danger); }
-  .chip.more { background: transparent; color: var(--muted); }
+  .chip { font-size: .63rem; padding: 1px 4px 1px 6px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid transparent; display: flex; align-items: center; gap: 3px; }
+  .chip .mdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .imp-high { background: var(--high-bg); color: #c43d56; border-left-color: var(--high); }
+  .imp-mid  { background: var(--mid-bg);  color: #b97c14; border-left-color: var(--mid); }
+  .imp-low  { background: var(--low-bg);  color: #2e7d57; border-left-color: var(--low); }
+  .chip.done { background: #f0f1f5 !important; color: var(--done) !important; text-decoration: line-through; border-left-color: var(--done) !important; }
+  .chip.more { background: transparent; color: var(--muted); border: none; }
 
-  /* サイドパネル */
-  .side { display: flex; flex-direction: column; gap: 16px; }
-  .panel { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 16px; }
-  .panel h3 { font-size: .95rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
-  .add-form { display: flex; flex-direction: column; gap: 8px; }
-  .add-form input[type="text"], .add-form input[type="time"], .add-form select {
-    font-family: inherit; font-size: .85rem; padding: 8px 10px;
-    border: 1px solid var(--border); border-radius: 8px; width: 100%;
-    background: #fff; color: var(--text);
-  }
-  .add-form .row { display: flex; gap: 8px; }
-  .todo-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
-  .todo-item {
-    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-    border: 1px solid var(--border); border-radius: 10px; background: #fff;
-  }
-  .todo-item.overdue { border-color: var(--danger); background: var(--danger-light); }
-  .todo-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
-  .todo-item .title { flex: 1; font-size: .85rem; word-break: break-all; }
+  /* 週・日表示 */
+  .timegrid { display: grid; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .tg-head { display: grid; border-bottom: 1px solid var(--border); background: #fafbfd; }
+  .tg-head .tg-day { padding: 6px 2px; text-align: center; font-size: .74rem; cursor: pointer; border-left: 1px solid var(--border); }
+  .tg-head .tg-day:hover { background: var(--accent-light); }
+  .tg-head .tg-day.today { background: var(--today-bg); }
+  .tg-head .tg-day.selected { box-shadow: inset 0 -3px 0 var(--accent); }
+  .tg-head .tg-day .dn { font-weight: bold; font-size: .9rem; }
+  .tg-allday { display: grid; border-bottom: 1px solid var(--border); min-height: 26px; }
+  .tg-allday .ad-cell { border-left: 1px solid var(--border); padding: 2px; display: flex; flex-direction: column; gap: 2px; }
+  .tg-scroll { max-height: 460px; overflow-y: auto; }
+  .tg-body { display: grid; position: relative; }
+  .tg-hours { font-size: .62rem; color: var(--muted); }
+  .tg-hours div { height: 44px; border-bottom: 1px solid #f0f2f7; padding: 2px 4px 0 0; text-align: right; }
+  .tg-col { position: relative; border-left: 1px solid var(--border); }
+  .tg-col .hline { height: 44px; border-bottom: 1px solid #f0f2f7; }
+  .tg-evt { position: absolute; left: 2px; right: 2px; border-radius: 5px; font-size: .64rem; padding: 2px 4px; overflow: hidden; cursor: pointer; border-left: 3px solid; }
+  .tg-evt.done { opacity: .55; text-decoration: line-through; }
+  .ev-high { background: var(--high-bg); color: #c43d56; border-left-color: var(--high); }
+  .ev-mid  { background: var(--mid-bg);  color: #b97c14; border-left-color: var(--mid); }
+  .ev-low  { background: var(--low-bg);  color: #2e7d57; border-left-color: var(--low); }
+  .nowline { position: absolute; left: 0; right: 0; height: 2px; background: var(--high); z-index: 5; pointer-events: none; }
+
+  /* フォーム */
+  .form { display: flex; flex-direction: column; gap: 8px; }
+  .form .row { display: flex; gap: 6px; }
+  .form .row > * { flex: 1; min-width: 0; }
+  .form label { font-size: .68rem; color: var(--muted); margin-bottom: -4px; }
+  .form-btns { display: flex; gap: 6px; }
+  .form-btns .btn-accent { flex: 1; }
+  #cancelEdit { display: none; background: #eef0f5; color: var(--muted); padding: 8px 12px; }
+
+  /* メンバー */
+  .members { display: flex; flex-wrap: wrap; gap: 6px; }
+  .member-chip { display: flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--border); background: #fff; font-size: .75rem; cursor: pointer; }
+  .member-chip.active { border-color: var(--accent); background: var(--accent-light); color: var(--accent); font-weight: bold; }
+  .member-chip .mdot { width: 9px; height: 9px; border-radius: 50%; }
+  .member-chip .rm { color: var(--muted); margin-left: 2px; font-size: .8rem; }
+  .member-chip .rm:hover { color: var(--high); }
+  .member-add { display: flex; gap: 6px; margin-top: 8px; }
+  .member-add input { flex: 1; min-width: 0; }
+  .member-add button { background: var(--accent-light); color: var(--accent); padding: 6px 12px; font-weight: bold; }
+
+  /* リスト */
+  .seg { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+  .seg button { flex: 1; border-radius: 0; padding: 5px 0; background: #fff; color: var(--muted); font-size: .74rem; }
+  .seg button.active { background: var(--accent); color: #fff; }
+  .todo-list { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .todo-item { display: flex; align-items: center; gap: 7px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 10px; border-left-width: 4px; cursor: pointer; }
+  .todo-item.bl-high { border-left-color: var(--high); }
+  .todo-item.bl-mid { border-left-color: var(--mid); }
+  .todo-item.bl-low { border-left-color: var(--low); }
+  .todo-item.overdue { background: var(--high-bg); }
+  .todo-item input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); flex-shrink: 0; }
+  .todo-item .title { flex: 1; font-size: .82rem; word-break: break-all; }
   .todo-item.done .title { text-decoration: line-through; color: var(--done); }
-  .todo-item .meta { font-size: .68rem; color: var(--muted); flex-shrink: 0; }
-  .todo-item .del { background: transparent; color: var(--muted); font-size: 1rem; padding: 0 4px; flex-shrink: 0; }
-  .todo-item .del:hover { color: var(--danger); }
-  .empty { color: var(--muted); font-size: .8rem; text-align: center; padding: 12px 0; }
-  .repeat-tag { font-size: .6rem; background: var(--accent-light); color: var(--accent); border-radius: 4px; padding: 1px 4px; }
-  .overdue-section .todo-item { border-color: var(--danger-light); }
-  footer { text-align: center; color: var(--muted); font-size: .72rem; padding: 20px 0 30px; }
+  .todo-item .meta { font-size: .64rem; color: var(--muted); text-align: right; flex-shrink: 0; line-height: 1.4; }
+  .todo-item .del { background: transparent; color: var(--muted); font-size: .95rem; padding: 0 3px; flex-shrink: 0; }
+  .todo-item .del:hover { color: var(--high); }
+  .tag { font-size: .58rem; border-radius: 4px; padding: 1px 4px; margin-left: 3px; }
+  .tag.rep { background: var(--accent-light); color: var(--accent); }
+  .assignee { display: inline-flex; align-items: center; gap: 3px; font-size: .62rem; color: var(--muted); }
+  .empty { color: var(--muted); font-size: .78rem; text-align: center; padding: 10px 0; }
+
+  /* 振り返り */
+  .rate-wrap { margin-bottom: 10px; }
+  .rate-label { display: flex; justify-content: space-between; font-size: .74rem; color: var(--muted); margin-bottom: 4px; }
+  .rate-bar { height: 12px; background: #edf0f6; border-radius: 999px; overflow: hidden; }
+  .rate-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #6fb1f0); border-radius: 999px; transition: width .4s; }
+  .review-form { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .review-form textarea { resize: vertical; min-height: 52px; }
+  .review-history { list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+  .review-history li { background: #f8f9fc; border-radius: 8px; padding: 7px 9px; font-size: .76rem; }
+  .review-history .rh-meta { font-size: .62rem; color: var(--muted); margin-bottom: 2px; display: flex; justify-content: space-between; }
+  .review-history .rh-del { cursor: pointer; color: var(--muted); }
+  .review-history .rh-del:hover { color: var(--high); }
+
+  footer { text-align: center; color: var(--muted); font-size: .7rem; padding: 18px 0 26px; line-height: 1.8; }
+  .legend { display: flex; gap: 10px; justify-content: center; font-size: .68rem; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .lg { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 </style>
 </head>
 <body>
 <header>
-  <h1><span class="logo">🗓️</span>ToDoカレンダー</h1>
-  <div class="header-actions">
+  <h1>✅ TantoList <small>ToDoカレンダー by 小関</small></h1>
+  <div class="hdr-actions">
     <span id="overdueBadge" class="overdue-badge"></span>
-    <button id="notifyBtn" class="btn-ghost">🔔 通知を有効化</button>
+    <div class="view-switch">
+      <button data-view="month" class="active">月</button>
+      <button data-view="week">週</button>
+      <button data-view="day">日</button>
+    </div>
     <button id="todayBtn" class="btn-ghost">今日へ</button>
+    <button id="notifyBtn" class="btn-ghost">🔔 通知</button>
+    <button id="exportBtn" class="btn-ghost">⬇ 書出</button>
+    <button id="importBtn" class="btn-ghost">⬆ 読込</button>
+    <input type="file" id="importFile" accept=".json" style="display:none">
   </div>
 </header>
 
 <main>
-  <section class="calendar-card">
+  <section class="card">
     <div class="cal-nav">
       <h2 id="calTitle"></h2>
-      <div class="nav-btns">
-        <button id="prevBtn">‹</button>
-        <button id="nextBtn">›</button>
-      </div>
+      <div class="nav-btns"><button id="prevBtn">‹</button> <button id="nextBtn">›</button></div>
     </div>
-    <table class="calendar">
-      <thead>
-        <tr>
-          <th class="sun">日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th class="sat">土</th>
-        </tr>
-      </thead>
-      <tbody id="calBody"></tbody>
-    </table>
+    <div id="calArea"></div>
+    <div class="legend">
+      <span><i class="lg" style="background:var(--high)"></i>重要度: 高</span>
+      <span><i class="lg" style="background:var(--mid)"></i>中</span>
+      <span><i class="lg" style="background:var(--low)"></i>低</span>
+    </div>
   </section>
 
   <aside class="side">
-    <div class="panel">
-      <h3>➕ <span id="addDateLabel"></span> に追加</h3>
-      <form class="add-form" id="addForm">
-        <input type="text" id="titleInput" placeholder="タスク名を入力" maxlength="100" required>
+    <div class="card">
+      <h3 id="formTitle">➕ タスクを追加</h3>
+      <form class="form" id="taskForm">
+        <input type="text" id="fTitle" placeholder="タスク名" maxlength="100" required>
         <div class="row">
-          <input type="time" id="timeInput">
-          <select id="repeatInput">
-            <option value="none">繰り返しなし</option>
-            <option value="daily">毎日</option>
-            <option value="weekly">毎週</option>
-            <option value="monthly">毎月</option>
-          </select>
+          <div><label>日付</label><input type="date" id="fDate" required style="width:100%"></div>
         </div>
-        <button type="submit" class="btn-accent">追加する</button>
+        <div class="row">
+          <div><label>開始</label><input type="time" id="fStart" style="width:100%"></div>
+          <div><label>終了</label><input type="time" id="fEnd" style="width:100%"></div>
+        </div>
+        <div class="row">
+          <div><label>重要度</label>
+            <select id="fImp" style="width:100%">
+              <option value="high">高</option>
+              <option value="mid" selected>中</option>
+              <option value="low">低</option>
+            </select>
+          </div>
+          <div><label>繰り返し</label>
+            <select id="fRep" style="width:100%">
+              <option value="none">なし</option>
+              <option value="daily">毎日</option>
+              <option value="weekly">毎週</option>
+              <option value="monthly">毎月</option>
+            </select>
+          </div>
+        </div>
+        <div><label>担当者</label>
+          <select id="fAssign" style="width:100%"><option value="">未割当</option></select>
+        </div>
+        <div class="form-btns">
+          <button type="submit" class="btn-accent" id="submitBtn">追加する</button>
+          <button type="button" id="cancelEdit">取消</button>
+        </div>
       </form>
     </div>
 
-    <div class="panel">
-      <h3>📋 <span id="listDateLabel"></span> のToDo</h3>
+    <div class="card">
+      <h3>👥 メンバー(担当者)</h3>
+      <div class="members" id="memberList"></div>
+      <div class="member-add">
+        <input type="text" id="memberName" placeholder="名前を入力" maxlength="20">
+        <button id="memberAddBtn" type="button">追加</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📋 <span id="listTitle"></span></h3>
+      <div class="seg" id="rangeSeg">
+        <button data-range="day" class="active">日次</button>
+        <button data-range="week">週次</button>
+        <button data-range="month">月次</button>
+      </div>
       <ul class="todo-list" id="todoList"></ul>
     </div>
 
-    <div class="panel overdue-section" id="overduePanel" style="display:none">
-      <h3>⚠️ 期限切れ</h3>
-      <ul class="todo-list" id="overdueList"></ul>
+    <div class="card">
+      <h3>📈 振り返り</h3>
+      <div class="seg" id="reviewSeg">
+        <button data-rv="week" class="active">週次</button>
+        <button data-rv="month">月次</button>
+      </div>
+      <div class="rate-wrap">
+        <div class="rate-label"><span id="rateLabel"></span><strong id="rateValue"></strong></div>
+        <div class="rate-bar"><div class="rate-fill" id="rateFill" style="width:0%"></div></div>
+      </div>
+      <div class="review-form">
+        <textarea id="reviewText" placeholder="この期間の振り返りコメント"></textarea>
+        <button type="button" class="btn-accent" id="reviewPost">コメントを投稿</button>
+      </div>
+      <ul class="review-history" id="reviewHistory"></ul>
     </div>
   </aside>
 </main>
 
-<footer>データはこのブラウザの localStorage に保存されます</footer>
+<footer>
+  データはこのブラウザの localStorage に保存されます(サーバー送信なし)<br>
+  家族・グループと共有するには「⬇ 書出」でJSONを渡し、相手の端末で「⬆ 読込」してください
+</footer>
 
 <script>
 (() => {
-  const STORAGE_KEY = 'todo-calendar-v1';
+  const KEY = 'tantolist-v1';
   const pad = n => String(n).padStart(2, '0');
-  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const parse = s => { const [y, m, dd] = s.split('-').map(Number); return new Date(y, m - 1, dd); };
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const parse = s => { const [y,m,dd] = s.split('-').map(Number); return new Date(y, m-1, dd); };
   const todayStr = () => fmt(new Date());
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  const $ = id => document.getElementById(id);
+  const YOUBI = ['日','月','火','水','木','金','土'];
+  const COLORS = ['#3b82d9','#e85d75','#43a878','#f0a832','#8e6fd8','#2bb3c0','#d8709a','#7a8a3a'];
+  const IMP_LABEL = { high:'高', mid:'中', low:'低' };
+  const REP_LABEL = { daily:'毎日', weekly:'毎週', monthly:'毎月' };
 
-  let todos = load();
-  let viewDate = new Date();      // 表示中の月
-  let selectedDate = todayStr();  // 選択中の日付
+  // ===== 状態 =====
+  let state = load();
+  let viewMode = 'month';          // month | week | day
+  let viewDate = new Date();
+  let selectedDate = todayStr();
+  let listRange = 'day';
+  let reviewMode = 'week';
+  let memberFilter = null;         // member id | null
+  let editingId = null;
 
   function load() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-    catch { return []; }
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY));
+      if (s && s.tasks) return s;
+    } catch {}
+    // 旧版(todo-calendar-v1)からの移行
+    let tasks = [];
+    try {
+      const old = JSON.parse(localStorage.getItem('todo-calendar-v1'));
+      if (Array.isArray(old)) tasks = old.map(t => ({
+        id: t.id, title: t.title, date: t.date, start: t.time || '', end: '',
+        importance: 'mid', repeat: t.repeat || 'none', assignee: '',
+        done: !!t.done, completedDates: t.completedDates || []
+      }));
+    } catch {}
+    return { tasks, members: [], comments: [] };
   }
-  function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(todos)); }
-  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
 
-  // 指定日にタスクが発生するか(繰り返しルール対応)
-  function occursOn(todo, dateStr) {
-    if (todo.repeat === 'none') return todo.date === dateStr;
-    if (dateStr < todo.date) return false;
-    const d = parse(dateStr), start = parse(todo.date);
-    switch (todo.repeat) {
-      case 'daily':   return true;
-      case 'weekly':  return d.getDay() === start.getDay();
-      case 'monthly': return d.getDate() === start.getDate();
-    }
+  // ===== タスクロジック =====
+  function occursOn(t, ds) {
+    if (t.repeat === 'none') return t.date === ds;
+    if (ds < t.date) return false;
+    const d = parse(ds), s = parse(t.date);
+    if (t.repeat === 'daily') return true;
+    if (t.repeat === 'weekly') return d.getDay() === s.getDay();
+    if (t.repeat === 'monthly') return d.getDate() === s.getDate();
     return false;
   }
-  function isDone(todo, dateStr) {
-    return todo.repeat === 'none' ? !!todo.done : (todo.completedDates || []).includes(dateStr);
-  }
-  function toggleDone(todo, dateStr) {
-    if (todo.repeat === 'none') { todo.done = !todo.done; }
+  const isDone = (t, ds) => t.repeat === 'none' ? !!t.done : (t.completedDates||[]).includes(ds);
+  function toggleDone(t, ds) {
+    if (t.repeat === 'none') t.done = !t.done;
     else {
-      todo.completedDates = todo.completedDates || [];
-      const i = todo.completedDates.indexOf(dateStr);
-      i >= 0 ? todo.completedDates.splice(i, 1) : todo.completedDates.push(dateStr);
+      t.completedDates = t.completedDates || [];
+      const i = t.completedDates.indexOf(ds);
+      i >= 0 ? t.completedDates.splice(i,1) : t.completedDates.push(ds);
     }
     save(); render();
   }
-  function todosOn(dateStr) {
-    return todos.filter(t => occursOn(t, dateStr))
-      .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
+  function tasksOn(ds) {
+    return state.tasks
+      .filter(t => occursOn(t, ds))
+      .filter(t => !memberFilter || t.assignee === memberFilter)
+      .sort((a,b) => (a.start||'99:99').localeCompare(b.start||'99:99'));
   }
-  // 期限切れ: 今日より前の未完了(繰り返しなしのみ)
-  function overdueTodos() {
-    const today = todayStr();
-    return todos.filter(t => t.repeat === 'none' && !t.done && t.date < today)
-      .sort((a, b) => a.date.localeCompare(b.date));
+  function overdue() {
+    const td = todayStr();
+    return state.tasks.filter(t => t.repeat==='none' && !t.done && t.date < td)
+      .filter(t => !memberFilter || t.assignee === memberFilter)
+      .sort((a,b) => a.date.localeCompare(b.date));
+  }
+  const memberOf = id => state.members.find(m => m.id === id);
+
+  // ===== 期間ヘルパー =====
+  function weekStart(d) { const x = new Date(d); x.setDate(x.getDate() - x.getDay()); return x; }
+  function weekDates(d) { const s = weekStart(d); return [...Array(7)].map((_,i) => { const x = new Date(s); x.setDate(s.getDate()+i); return x; }); }
+  function monthDates(d) {
+    const y = d.getFullYear(), m = d.getMonth();
+    const n = new Date(y, m+1, 0).getDate();
+    return [...Array(n)].map((_,i) => new Date(y, m, i+1));
+  }
+  function periodDates(type, baseDs) {
+    const b = parse(baseDs);
+    return (type === 'week' ? weekDates(b) : monthDates(b)).map(fmt);
+  }
+  function periodKey(type, baseDs) {
+    const b = parse(baseDs);
+    return type === 'week' ? 'W' + fmt(weekStart(b)) : 'M' + baseDs.slice(0,7);
+  }
+  function periodLabel(type, baseDs) {
+    const b = parse(baseDs);
+    if (type === 'week') {
+      const ds = weekDates(b);
+      return `${ds[0].getMonth()+1}/${ds[0].getDate()}〜${ds[6].getMonth()+1}/${ds[6].getDate()}`;
+    }
+    return `${b.getFullYear()}年${b.getMonth()+1}月`;
   }
 
   // ===== 描画 =====
-  const $ = id => document.getElementById(id);
-
-  function render() { renderCalendar(); renderSide(); renderOverdue(); }
+  function render() {
+    renderCalendar(); renderForm(); renderMembers(); renderList(); renderReview(); renderOverdue();
+  }
 
   function renderCalendar() {
+    const area = $('calArea');
+    area.innerHTML = '';
+    if (viewMode === 'month') { $('calTitle').textContent = `${viewDate.getFullYear()}年 ${viewDate.getMonth()+1}月`; area.appendChild(buildMonth()); }
+    else if (viewMode === 'week') { const ds = weekDates(viewDate); $('calTitle').textContent = `${ds[0].getFullYear()}年 ${ds[0].getMonth()+1}/${ds[0].getDate()} 〜 ${ds[6].getMonth()+1}/${ds[6].getDate()}`; area.appendChild(buildTimeGrid(ds)); }
+    else { $('calTitle').textContent = `${viewDate.getFullYear()}年 ${viewDate.getMonth()+1}月${viewDate.getDate()}日(${YOUBI[viewDate.getDay()]})`; area.appendChild(buildTimeGrid([new Date(viewDate)])); }
+  }
+
+  function chipFor(t, ds) {
+    const c = document.createElement('div');
+    c.className = `chip imp-${t.importance}` + (isDone(t,ds) ? ' done' : '');
+    const m = memberOf(t.assignee);
+    if (m) { const dot = document.createElement('i'); dot.className = 'mdot'; dot.style.background = m.color; c.appendChild(dot); }
+    c.appendChild(document.createTextNode((t.start ? t.start+' ' : '') + t.title));
+    c.title = t.title + (m ? ` (${m.name})` : '');
+    return c;
+  }
+
+  function buildMonth() {
     const y = viewDate.getFullYear(), m = viewDate.getMonth();
-    $('calTitle').textContent = `${y}年 ${m + 1}月`;
-    const first = new Date(y, m, 1);
-    const startOffset = first.getDay();
-    const body = $('calBody');
-    body.innerHTML = '';
-    const today = todayStr();
-    let cur = new Date(y, m, 1 - startOffset);
-    for (let w = 0; w < 6; w++) {
+    const tbl = document.createElement('table');
+    tbl.className = 'calendar';
+    tbl.innerHTML = '<thead><tr><th class="sun">日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th class="sat">土</th></tr></thead>';
+    const tb = document.createElement('tbody');
+    const td0 = todayStr();
+    let cur = new Date(y, m, 1 - new Date(y,m,1).getDay());
+    for (let w=0; w<6; w++) {
       const tr = document.createElement('tr');
-      for (let dow = 0; dow < 7; dow++) {
+      for (let dow=0; dow<7; dow++) {
         const td = document.createElement('td');
         const ds = fmt(cur);
-        const inMonth = cur.getMonth() === m;
-        if (!inMonth) td.classList.add('other');
-        if (ds === today) td.classList.add('today');
+        if (cur.getMonth() !== m) td.classList.add('other');
+        if (ds === td0) td.classList.add('today');
         if (ds === selectedDate) td.classList.add('selected');
-        if (dow === 0) td.classList.add('sun-cell');
-        if (dow === 6) td.classList.add('sat-cell');
-        const num = document.createElement('div');
-        num.className = 'day-num';
-        num.textContent = cur.getDate();
-        td.appendChild(num);
-
-        const list = todosOn(ds);
+        if (dow===0) td.classList.add('sun-cell'); if (dow===6) td.classList.add('sat-cell');
+        td.innerHTML = `<div class="day-num">${cur.getDate()}</div>`;
+        const list = tasksOn(ds);
         if (list.length) {
-          const wrap = document.createElement('div');
-          wrap.className = 'cell-todos';
-          list.slice(0, 3).forEach(t => {
-            const chip = document.createElement('div');
-            chip.className = 'chip';
-            if (isDone(t, ds)) chip.classList.add('done');
-            else if (ds < today) chip.classList.add('overdue');
-            chip.textContent = (t.time ? t.time + ' ' : '') + t.title;
-            chip.title = t.title;
-            wrap.appendChild(chip);
-          });
-          if (list.length > 3) {
-            const more = document.createElement('div');
-            more.className = 'chip more';
-            more.textContent = `+${list.length - 3}件`;
-            wrap.appendChild(more);
-          }
+          const wrap = document.createElement('div'); wrap.className = 'cell-todos';
+          list.slice(0,3).forEach(t => wrap.appendChild(chipFor(t, ds)));
+          if (list.length > 3) { const mo = document.createElement('div'); mo.className='chip more'; mo.textContent = `+${list.length-3}件`; wrap.appendChild(mo); }
           td.appendChild(wrap);
         }
-        td.addEventListener('click', () => { selectedDate = ds; render(); });
+        td.addEventListener('click', () => { selectedDate = ds; $('fDate').value = ds; render(); });
         tr.appendChild(td);
-        cur.setDate(cur.getDate() + 1);
+        cur.setDate(cur.getDate()+1);
       }
-      body.appendChild(tr);
+      tb.appendChild(tr);
+    }
+    tbl.appendChild(tb);
+    return tbl;
+  }
+
+  const HOUR_H = 44;
+  function buildTimeGrid(dates) {
+    const n = dates.length;
+    const wrap = document.createElement('div'); wrap.className = 'timegrid';
+    const cols = `46px repeat(${n}, 1fr)`;
+    const td0 = todayStr();
+
+    const head = document.createElement('div'); head.className = 'tg-head'; head.style.gridTemplateColumns = cols;
+    head.appendChild(document.createElement('div'));
+    dates.forEach(d => {
+      const ds = fmt(d);
+      const c = document.createElement('div');
+      c.className = 'tg-day' + (ds===td0?' today':'') + (ds===selectedDate?' selected':'');
+      c.innerHTML = `${YOUBI[d.getDay()]}<div class="dn">${d.getDate()}</div>`;
+      c.addEventListener('click', () => { selectedDate = ds; $('fDate').value = ds; render(); });
+      head.appendChild(c);
+    });
+    wrap.appendChild(head);
+
+    // 終日(時刻なし)行
+    const ad = document.createElement('div'); ad.className = 'tg-allday'; ad.style.gridTemplateColumns = cols;
+    const adl = document.createElement('div'); adl.style.cssText = 'font-size:.6rem;color:var(--muted);padding:4px;text-align:right'; adl.textContent = '終日'; ad.appendChild(adl);
+    dates.forEach(d => {
+      const ds = fmt(d);
+      const cell = document.createElement('div'); cell.className = 'ad-cell';
+      tasksOn(ds).filter(t => !t.start).forEach(t => {
+        const ch = chipFor(t, ds);
+        ch.addEventListener('click', e => { e.stopPropagation(); startEdit(t, ds); });
+        cell.appendChild(ch);
+      });
+      ad.appendChild(cell);
+    });
+    wrap.appendChild(ad);
+
+    const scroll = document.createElement('div'); scroll.className = 'tg-scroll';
+    const body = document.createElement('div'); body.className = 'tg-body'; body.style.gridTemplateColumns = cols;
+    const hours = document.createElement('div'); hours.className = 'tg-hours';
+    for (let h=0; h<24; h++) { const hd = document.createElement('div'); hd.textContent = `${h}:00`; hours.appendChild(hd); }
+    body.appendChild(hours);
+
+    dates.forEach(d => {
+      const ds = fmt(d);
+      const col = document.createElement('div'); col.className = 'tg-col';
+      for (let h=0; h<24; h++) col.appendChild(Object.assign(document.createElement('div'), {className:'hline'}));
+      tasksOn(ds).filter(t => t.start).forEach((t, i) => {
+        const [sh, sm] = t.start.split(':').map(Number);
+        let endMin = sh*60 + sm + 60;
+        if (t.end) { const [eh, em] = t.end.split(':').map(Number); endMin = eh*60 + em; }
+        const top = (sh*60+sm) / 60 * HOUR_H;
+        const height = Math.max(((endMin - (sh*60+sm)) / 60) * HOUR_H, 20);
+        const ev = document.createElement('div');
+        ev.className = `tg-evt ev-${t.importance}` + (isDone(t,ds) ? ' done' : '');
+        ev.style.top = top + 'px'; ev.style.height = height + 'px';
+        if (i % 2 === 1) ev.style.left = '8px';
+        const m = memberOf(t.assignee);
+        ev.textContent = `${t.start}${t.end ? '-'+t.end : ''} ${t.title}` + (m ? ` @${m.name}` : '');
+        ev.title = ev.textContent;
+        ev.addEventListener('click', () => startEdit(t, ds));
+        col.appendChild(ev);
+      });
+      if (ds === td0) {
+        const now = new Date();
+        const nl = document.createElement('div'); nl.className = 'nowline';
+        nl.style.top = ((now.getHours()*60 + now.getMinutes())/60*HOUR_H) + 'px';
+        col.appendChild(nl);
+      }
+      body.appendChild(col);
+    });
+    scroll.appendChild(body);
+    wrap.appendChild(scroll);
+    setTimeout(() => { scroll.scrollTop = 7 * HOUR_H; }, 0);
+    return wrap;
+  }
+
+  // ===== フォーム =====
+  function renderForm() {
+    const sel = $('fAssign');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">未割当</option>';
+    state.members.forEach(m => {
+      const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; sel.appendChild(o);
+    });
+    sel.value = cur && memberOf(cur) ? cur : (editingId ? sel.value : '');
+    if (!$('fDate').value) $('fDate').value = selectedDate;
+  }
+  function startEdit(t, ds) {
+    editingId = t.id;
+    selectedDate = ds;
+    $('formTitle').textContent = '✏️ タスクを編集';
+    $('fTitle').value = t.title; $('fDate').value = t.date;
+    $('fStart').value = t.start || ''; $('fEnd').value = t.end || '';
+    $('fImp').value = t.importance; $('fRep').value = t.repeat;
+    renderForm(); $('fAssign').value = t.assignee || '';
+    $('submitBtn').textContent = '更新する';
+    $('cancelEdit').style.display = 'block';
+    $('fTitle').focus();
+  }
+  function resetForm() {
+    editingId = null;
+    $('taskForm').reset();
+    $('fImp').value = 'mid'; $('fRep').value = 'none';
+    $('fDate').value = selectedDate;
+    $('formTitle').textContent = '➕ タスクを追加';
+    $('submitBtn').textContent = '追加する';
+    $('cancelEdit').style.display = 'none';
+  }
+  $('taskForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const title = $('fTitle').value.trim();
+    if (!title) return;
+    const data = {
+      title, date: $('fDate').value || selectedDate,
+      start: $('fStart').value || '', end: $('fEnd').value || '',
+      importance: $('fImp').value, repeat: $('fRep').value,
+      assignee: $('fAssign').value || ''
+    };
+    if (data.end && data.start && data.end < data.start) { alert('終了時刻は開始より後にしてください'); return; }
+    if (editingId) {
+      const t = state.tasks.find(x => x.id === editingId);
+      if (t) Object.assign(t, data);
+    } else {
+      state.tasks.push({ id: uid(), ...data, done: false, completedDates: [] });
+    }
+    selectedDate = data.date;
+    viewDate = parse(data.date);
+    save(); resetForm(); render();
+  });
+  $('cancelEdit').addEventListener('click', () => { resetForm(); });
+
+  // ===== メンバー =====
+  function renderMembers() {
+    const wrap = $('memberList');
+    wrap.innerHTML = '';
+    const all = document.createElement('div');
+    all.className = 'member-chip' + (memberFilter === null ? ' active' : '');
+    all.textContent = '全員';
+    all.addEventListener('click', () => { memberFilter = null; render(); });
+    wrap.appendChild(all);
+    state.members.forEach(m => {
+      const c = document.createElement('div');
+      c.className = 'member-chip' + (memberFilter === m.id ? ' active' : '');
+      c.innerHTML = `<i class="mdot" style="background:${m.color}"></i>${m.name}`;
+      const rm = document.createElement('span'); rm.className = 'rm'; rm.textContent = '✕';
+      rm.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!confirm(`メンバー「${m.name}」を削除しますか?(タスクは未割当になります)`)) return;
+        state.members = state.members.filter(x => x.id !== m.id);
+        state.tasks.forEach(t => { if (t.assignee === m.id) t.assignee = ''; });
+        if (memberFilter === m.id) memberFilter = null;
+        save(); render();
+      });
+      c.appendChild(rm);
+      c.addEventListener('click', () => { memberFilter = memberFilter === m.id ? null : m.id; render(); });
+      wrap.appendChild(c);
+    });
+    if (!state.members.length) {
+      const e = document.createElement('div'); e.className = 'empty'; e.style.padding = '4px';
+      e.textContent = '家族やグループのメンバーを追加して、タスクに担当者を割り当てられます';
+      wrap.appendChild(e);
     }
   }
-
-  function labelOf(ds) {
-    const d = parse(ds);
-    const youbi = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
-    return `${d.getMonth() + 1}/${d.getDate()}(${youbi})`;
+  function addMember() {
+    const name = $('memberName').value.trim();
+    if (!name) return;
+    if (state.members.some(m => m.name === name)) { alert('同名のメンバーがいます'); return; }
+    state.members.push({ id: uid(), name, color: COLORS[state.members.length % COLORS.length] });
+    $('memberName').value = '';
+    save(); render();
   }
-  const repeatLabel = { daily: '毎日', weekly: '毎週', monthly: '毎月' };
+  $('memberAddBtn').addEventListener('click', addMember);
+  $('memberName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addMember(); } });
 
-  function makeItem(t, ds, showDate) {
+  // ===== リスト =====
+  function renderList() {
+    const lbl = { day: labelOf(selectedDate), week: periodLabel('week', selectedDate)+' の週', month: periodLabel('month', selectedDate) };
+    $('listTitle').textContent = lbl[listRange] + ' のToDo';
+    const ul = $('todoList');
+    ul.innerHTML = '';
+    let items = [];
+    if (listRange === 'day') items = tasksOn(selectedDate).map(t => [t, selectedDate]);
+    else periodDates(listRange === 'week' ? 'week' : 'month', selectedDate)
+      .forEach(ds => tasksOn(ds).forEach(t => items.push([t, ds])));
+    if (!items.length) { ul.innerHTML = '<li class="empty">ToDoはありません</li>'; }
+    items.forEach(([t, ds]) => ul.appendChild(listItem(t, ds, listRange !== 'day')));
+    // 期限切れ
+    const ov = overdue();
+    if (ov.length) {
+      const h = document.createElement('li'); h.className = 'empty'; h.style.cssText = 'color:var(--high);text-align:left;font-weight:bold;padding:6px 0 0';
+      h.textContent = `⚠️ 期限切れ ${ov.length}件`;
+      ul.appendChild(h);
+      ov.forEach(t => ul.appendChild(listItem(t, t.date, true)));
+    }
+  }
+  function labelOf(ds) { const d = parse(ds); return `${d.getMonth()+1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
+  function listItem(t, ds, showDate) {
     const li = document.createElement('li');
-    li.className = 'todo-item';
+    li.className = `todo-item bl-${t.importance}`;
     const done = isDone(t, ds);
     if (done) li.classList.add('done');
     else if (ds < todayStr()) li.classList.add('overdue');
-
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = done;
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = done;
+    cb.addEventListener('click', e => e.stopPropagation());
     cb.addEventListener('change', () => toggleDone(t, ds));
-
-    const title = document.createElement('span');
-    title.className = 'title';
-    title.textContent = t.title;
-    if (t.repeat !== 'none') {
-      const tag = document.createElement('span');
-      tag.className = 'repeat-tag';
-      tag.textContent = '🔁' + repeatLabel[t.repeat];
-      title.appendChild(document.createTextNode(' '));
-      title.appendChild(tag);
-    }
-
-    const meta = document.createElement('span');
-    meta.className = 'meta';
-    meta.textContent = showDate ? labelOf(ds) : (t.time || '');
-
-    const del = document.createElement('button');
-    del.className = 'del';
-    del.textContent = '✕';
-    del.title = '削除';
-    del.addEventListener('click', () => {
+    const sp = document.createElement('span'); sp.className = 'title';
+    sp.textContent = t.title;
+    sp.insertAdjacentHTML('beforeend',
+      `<span class="tag" style="background:${impBg(t.importance)};color:${impFg(t.importance)}">${IMP_LABEL[t.importance]}</span>` +
+      (t.repeat !== 'none' ? `<span class="tag rep">🔁${REP_LABEL[t.repeat]}</span>` : ''));
+    const m = memberOf(t.assignee);
+    if (m) sp.insertAdjacentHTML('beforeend', `<br><span class="assignee"><i class="mdot" style="width:7px;height:7px;border-radius:50%;display:inline-block;background:${m.color}"></i>${esc(m.name)}</span>`);
+    const meta = document.createElement('span'); meta.className = 'meta';
+    meta.innerHTML = (showDate ? labelOf(ds) + '<br>' : '') + (t.start ? t.start + (t.end ? '-'+t.end : '') : '');
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕'; del.title = '削除';
+    del.addEventListener('click', e => {
+      e.stopPropagation();
       if (t.repeat !== 'none' && !confirm(`「${t.title}」は繰り返しタスクです。すべて削除しますか?`)) return;
-      todos = todos.filter(x => x.id !== t.id);
+      state.tasks = state.tasks.filter(x => x.id !== t.id);
+      if (editingId === t.id) resetForm();
       save(); render();
     });
-
-    li.append(cb, title, meta, del);
+    li.append(cb, sp, meta, del);
+    li.addEventListener('click', () => startEdit(t, ds));
     return li;
   }
+  const impBg = i => ({high:'var(--high-bg)',mid:'var(--mid-bg)',low:'var(--low-bg)'})[i];
+  const impFg = i => ({high:'#c43d56',mid:'#b97c14',low:'#2e7d57'})[i];
+  const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-  function renderSide() {
-    $('addDateLabel').textContent = labelOf(selectedDate);
-    $('listDateLabel').textContent = labelOf(selectedDate);
-    const ul = $('todoList');
-    ul.innerHTML = '';
-    const list = todosOn(selectedDate);
-    if (!list.length) {
-      ul.innerHTML = '<li class="empty">ToDoはありません</li>';
-      return;
-    }
-    list.forEach(t => ul.appendChild(makeItem(t, selectedDate, false)));
-  }
-
-  function renderOverdue() {
-    const list = overdueTodos();
-    const badge = $('overdueBadge');
-    const panel = $('overduePanel');
-    if (!list.length) { badge.style.display = 'none'; panel.style.display = 'none'; return; }
-    badge.style.display = 'inline-block';
-    badge.textContent = `期限切れ ${list.length}件`;
-    panel.style.display = 'block';
-    const ul = $('overdueList');
-    ul.innerHTML = '';
-    list.forEach(t => ul.appendChild(makeItem(t, t.date, true)));
-  }
-
-  // ===== イベント =====
-  $('addForm').addEventListener('submit', e => {
-    e.preventDefault();
-    const title = $('titleInput').value.trim();
-    if (!title) return;
-    todos.push({
-      id: uid(), title,
-      date: selectedDate,
-      time: $('timeInput').value || null,
-      repeat: $('repeatInput').value,
-      done: false, completedDates: []
+  // ===== 振り返り =====
+  function calcRate(type, baseDs) {
+    let total = 0, done = 0;
+    const today = todayStr();
+    periodDates(type, baseDs).forEach(ds => {
+      state.tasks.filter(t => occursOn(t, ds)).forEach(t => {
+        total++;
+        if (isDone(t, ds)) done++;
+      });
     });
-    $('titleInput').value = '';
-    $('timeInput').value = '';
-    $('repeatInput').value = 'none';
-    save(); render();
+    return { total, done, rate: total ? Math.round(done/total*100) : 0 };
+  }
+  function renderReview() {
+    const { total, done, rate } = calcRate(reviewMode, selectedDate);
+    $('rateLabel').textContent = `${periodLabel(reviewMode, selectedDate)} の達成率 (${done}/${total}件)`;
+    $('rateValue').textContent = rate + '%';
+    $('rateFill').style.width = rate + '%';
+    const ul = $('reviewHistory');
+    ul.innerHTML = '';
+    const list = (state.comments || []).filter(c => c.type === reviewMode).sort((a,b) => b.createdAt - a.createdAt);
+    if (!list.length) { ul.innerHTML = '<li class="empty">コメント履歴はまだありません</li>'; return; }
+    list.forEach(c => {
+      const li = document.createElement('li');
+      const meta = document.createElement('div'); meta.className = 'rh-meta';
+      const when = new Date(c.createdAt);
+      meta.innerHTML = `<span>${esc(c.label)} ・ 達成率${c.rate}%</span>`;
+      const del = document.createElement('span'); del.className = 'rh-del'; del.textContent = '✕';
+      del.addEventListener('click', () => { state.comments = state.comments.filter(x => x.id !== c.id); save(); renderReview(); });
+      meta.appendChild(del);
+      const body = document.createElement('div'); body.textContent = c.text;
+      li.append(meta, body);
+      ul.appendChild(li);
+    });
+  }
+  $('reviewPost').addEventListener('click', () => {
+    const text = $('reviewText').value.trim();
+    if (!text) return;
+    const { rate } = calcRate(reviewMode, selectedDate);
+    state.comments = state.comments || [];
+    state.comments.push({
+      id: uid(), type: reviewMode, key: periodKey(reviewMode, selectedDate),
+      label: periodLabel(reviewMode, selectedDate), rate, text, createdAt: Date.now()
+    });
+    $('reviewText').value = '';
+    save(); renderReview();
   });
-  $('prevBtn').addEventListener('click', () => { viewDate.setMonth(viewDate.getMonth() - 1); render(); });
-  $('nextBtn').addEventListener('click', () => { viewDate.setMonth(viewDate.getMonth() + 1); render(); });
-  $('todayBtn').addEventListener('click', () => { viewDate = new Date(); selectedDate = todayStr(); render(); });
 
-  // ===== 通知 =====
-  function notifyToday() {
+  // ===== 期限切れバッジ =====
+  function renderOverdue() {
+    const ov = overdue();
+    const b = $('overdueBadge');
+    b.style.display = ov.length ? 'inline-block' : 'none';
+    b.textContent = `期限切れ ${ov.length}件`;
+  }
+
+  // ===== ナビ =====
+  document.querySelectorAll('.view-switch button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      viewMode = btn.dataset.view;
+      document.querySelectorAll('.view-switch button').forEach(b => b.classList.toggle('active', b === btn));
+      viewDate = parse(selectedDate);
+      renderCalendar();
+    });
+  });
+  $('prevBtn').addEventListener('click', () => move(-1));
+  $('nextBtn').addEventListener('click', () => move(1));
+  function move(dir) {
+    if (viewMode === 'month') viewDate.setMonth(viewDate.getMonth() + dir);
+    else if (viewMode === 'week') viewDate.setDate(viewDate.getDate() + 7*dir);
+    else { viewDate.setDate(viewDate.getDate() + dir); selectedDate = fmt(viewDate); $('fDate').value = selectedDate; }
+    render();
+  }
+  $('todayBtn').addEventListener('click', () => { viewDate = new Date(); selectedDate = todayStr(); $('fDate').value = selectedDate; render(); });
+  document.querySelectorAll('#rangeSeg button').forEach(btn => btn.addEventListener('click', () => {
+    listRange = btn.dataset.range;
+    document.querySelectorAll('#rangeSeg button').forEach(b => b.classList.toggle('active', b === btn));
+    renderList();
+  }));
+  document.querySelectorAll('#reviewSeg button').forEach(btn => btn.addEventListener('click', () => {
+    reviewMode = btn.dataset.rv;
+    document.querySelectorAll('#reviewSeg button').forEach(b => b.classList.toggle('active', b === btn));
+    renderReview();
+  }));
+
+  // ===== 書出/読込 =====
+  $('exportBtn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `tantolist-${todayStr()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const data = JSON.parse(r.result);
+        if (!data || !Array.isArray(data.tasks)) throw 0;
+        if (!confirm('現在のデータを読み込んだ内容で置き換えます。よろしいですか?')) return;
+        state = { tasks: data.tasks, members: data.members || [], comments: data.comments || [] };
+        save(); resetForm(); render();
+      } catch { alert('読み込めないファイルです'); }
+    };
+    r.readAsText(f);
+    e.target.value = '';
+  });
+
+  // ===== 通知(期限1時間前) =====
+  function notifKey() { return 'tantolist-notified-' + todayStr(); }
+  function checkNotify() {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const ds = todayStr();
-    const remain = todosOn(ds).filter(t => !isDone(t, ds));
-    const over = overdueTodos();
-    if (!remain.length && !over.length) return;
-    const parts = [];
-    if (remain.length) parts.push(`今日のToDo ${remain.length}件`);
-    if (over.length) parts.push(`期限切れ ${over.length}件`);
-    new Notification('🗓️ ToDoカレンダー', { body: parts.join(' / ') });
+    const now = new Date();
+    const nowMin = now.getHours()*60 + now.getMinutes();
+    let sent = {};
+    try { sent = JSON.parse(localStorage.getItem(notifKey())) || {}; } catch {}
+    state.tasks.filter(t => occursOn(t, ds) && t.start && !isDone(t, ds)).forEach(t => {
+      const [h, m] = t.start.split(':').map(Number);
+      const diff = h*60 + m - nowMin;
+      if (diff > 0 && diff <= 60 && !sent[t.id]) {
+        const mm = memberOf(t.assignee);
+        new Notification('⏰ TantoList', { body: `「${t.title}」${mm ? `(担当: ${mm.name})` : ''} は ${t.start} 開始です(あと${diff}分)` });
+        sent[t.id] = 1;
+      }
+    });
+    localStorage.setItem(notifKey(), JSON.stringify(sent));
   }
   function updateNotifyBtn() {
     const btn = $('notifyBtn');
     if (!('Notification' in window)) { btn.style.display = 'none'; return; }
-    if (Notification.permission === 'granted') btn.style.display = 'none';
+    btn.style.display = Notification.permission === 'granted' ? 'none' : '';
   }
   $('notifyBtn').addEventListener('click', async () => {
-    const perm = await Notification.requestPermission();
-    updateNotifyBtn();
-    if (perm === 'granted') notifyToday();
+    await Notification.requestPermission();
+    updateNotifyBtn(); checkNotify();
   });
+  setInterval(checkNotify, 60000);
 
-  // 日付が変わったら再描画(開きっぱなし対策)
+  // 日付跨ぎ対応
   let lastDay = todayStr();
-  setInterval(() => {
-    if (todayStr() !== lastDay) { lastDay = todayStr(); render(); notifyToday(); }
-  }, 60000);
+  setInterval(() => { if (todayStr() !== lastDay) { lastDay = todayStr(); render(); } }, 60000);
 
+  // ===== PWA =====
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
+  $('fDate').value = selectedDate;
   updateNotifyBtn();
   render();
-  notifyToday();
+  checkNotify();
 })();
 </script>
 </body>
