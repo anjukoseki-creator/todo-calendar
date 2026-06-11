@@ -314,6 +314,7 @@
   const REP_LABEL = { daily:'毎日', weekly:'毎週', monthly:'毎月' };
 
   // ===== 状態 =====
+  const DEFAULTS = { tasks: [], members: [], comments: [], goals: {}, memo: { text: '', updatedAt: 0 } };
   let state = load();
   let viewMode = 'month';          // month | week | day
   let viewDate = new Date();
@@ -323,7 +324,6 @@
   let memberFilter = null;         // member id | null
   let editingId = null;
 
-  const DEFAULTS = { tasks: [], members: [], comments: [], goals: {}, memo: { text: '', updatedAt: 0 } };
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
