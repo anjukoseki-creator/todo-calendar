@@ -62,7 +62,6 @@
   td.sun-cell .day-num { color: var(--high); } td.sat-cell .day-num { color: var(--accent); }
   .cell-todos { margin-top: 2px; display: flex; flex-direction: column; gap: 2px; }
   .chip { font-size: .63rem; padding: 1px 4px 1px 6px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid transparent; display: flex; align-items: center; gap: 3px; }
-  .chip .mdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .imp-high { background: var(--high-bg); color: #c43d56; border-left-color: var(--high); }
   .imp-mid  { background: var(--mid-bg);  color: #b97c14; border-left-color: var(--mid); }
   .imp-low  { background: var(--low-bg);  color: #2e7d57; border-left-color: var(--low); }
@@ -101,17 +100,6 @@
   .form-btns .btn-accent { flex: 1; }
   #cancelEdit { display: none; background: #eef0f5; color: var(--muted); padding: 8px 12px; }
 
-  /* メンバー */
-  .members { display: flex; flex-wrap: wrap; gap: 6px; }
-  .member-chip { display: flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--border); background: #fff; font-size: .75rem; cursor: pointer; }
-  .member-chip.active { border-color: var(--accent); background: var(--accent-light); color: var(--accent); font-weight: bold; }
-  .member-chip .mdot { width: 9px; height: 9px; border-radius: 50%; }
-  .member-chip .rm { color: var(--muted); margin-left: 2px; font-size: .8rem; }
-  .member-chip .rm:hover { color: var(--high); }
-  .member-add { display: flex; gap: 6px; margin-top: 8px; }
-  .member-add input { flex: 1; min-width: 0; }
-  .member-add button { background: var(--accent-light); color: var(--accent); padding: 6px 12px; font-weight: bold; }
-
   /* リスト */
   .seg { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
   .seg button { flex: 1; border-radius: 0; padding: 5px 0; background: #fff; color: var(--muted); font-size: .74rem; }
@@ -130,7 +118,6 @@
   .todo-item .del:hover { color: var(--high); }
   .tag { font-size: .58rem; border-radius: 4px; padding: 1px 4px; margin-left: 3px; }
   .tag.rep { background: var(--accent-light); color: var(--accent); }
-  .assignee { display: inline-flex; align-items: center; gap: 3px; font-size: .62rem; color: var(--muted); }
   .empty { color: var(--muted); font-size: .78rem; text-align: center; padding: 10px 0; }
 
   /* 振り返り */
@@ -153,8 +140,16 @@
   .goal-text.placeholder { color: var(--muted); border-color: var(--border); }
   .goal-input { flex: 1; }
 
-  /* メモ */
-  .memo-area { width: 100%; min-height: 110px; resize: vertical; line-height: 1.6; }
+  /* メモ(タブ式) */
+  .memo-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .memo-tab { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: .75rem; cursor: pointer; color: var(--muted); transition: background .15s; }
+  .memo-tab:hover { background: var(--accent-light); }
+  .memo-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: bold; }
+  .memo-tab.add { font-weight: bold; color: var(--accent); background: var(--accent-light); border-color: transparent; }
+  .memo-act { opacity: .75; padding: 0 1px; }
+  .memo-act:hover { opacity: 1; }
+  .memo-rename { font-size: .75rem; padding: 2px 5px; width: 100px; }
+  .memo-area { width: 100%; min-height: 130px; resize: vertical; line-height: 1.6; }
   .memo-status { font-size: .64rem; color: var(--muted); text-align: right; margin-top: 4px; min-height: 1em; }
 
   /* トースト */
@@ -238,23 +233,11 @@
             </select>
           </div>
         </div>
-        <div><label>担当者</label>
-          <select id="fAssign" style="width:100%"><option value="">未割当</option></select>
-        </div>
         <div class="form-btns">
           <button type="submit" class="btn-accent" id="submitBtn">追加する</button>
           <button type="button" id="cancelEdit">取消</button>
         </div>
       </form>
-    </div>
-
-    <div class="card">
-      <h3>👥 メンバー(担当者)</h3>
-      <div class="members" id="memberList"></div>
-      <div class="member-add">
-        <input type="text" id="memberName" placeholder="名前を入力" maxlength="20">
-        <button id="memberAddBtn" type="button">追加</button>
-      </div>
     </div>
 
     <div class="card">
@@ -286,6 +269,7 @@
 
     <div class="card">
       <h3>📝 メモ</h3>
+      <div class="memo-tabs" id="memoTabs"></div>
       <textarea id="memoArea" class="memo-area" placeholder="買い物リスト、アイデア、連絡事項など自由にどうぞ(自動保存)"></textarea>
       <div class="memo-status" id="memoStatus"></div>
     </div>
@@ -296,7 +280,7 @@
 
 <footer>
   データはこのブラウザの localStorage に保存されます(サーバー送信なし)<br>
-  家族・グループと共有するには「⬇ 書出」でJSONを渡し、相手の端末で「⬆ 読込」してください
+  バックアップや別端末への移行には「⬇ 書出」/「⬆ 読込」を使ってください
 </footer>
 
 <script>
@@ -309,25 +293,34 @@
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
   const $ = id => document.getElementById(id);
   const YOUBI = ['日','月','火','水','木','金','土'];
-  const COLORS = ['#3b82d9','#e85d75','#43a878','#f0a832','#8e6fd8','#2bb3c0','#d8709a','#7a8a3a'];
   const IMP_LABEL = { high:'高', mid:'中', low:'低' };
   const REP_LABEL = { daily:'毎日', weekly:'毎週', monthly:'毎月' };
 
   // ===== 状態 =====
-  const DEFAULTS = { tasks: [], members: [], comments: [], goals: {}, memo: { text: '', updatedAt: 0 } };
+  const DEFAULTS = { tasks: [], comments: [], goals: {}, memos: [] };
+  function normalize(s) {
+    const st = Object.assign({}, DEFAULTS, s || {});
+    delete st.members;
+    if (!Array.isArray(st.memos)) st.memos = [];
+    if (!st.memos.length) {
+      const old = s && s.memo;
+      st.memos = [{ id: uid(), title: 'メモ1', text: (old && old.text) || '', updatedAt: (old && old.updatedAt) || 0 }];
+    }
+    delete st.memo;
+    return st;
+  }
   let state = load();
   let viewMode = 'month';          // month | week | day
   let viewDate = new Date();
   let selectedDate = todayStr();
   let listRange = 'day';
   let reviewMode = 'week';
-  let memberFilter = null;         // member id | null
   let editingId = null;
 
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
-      if (s && s.tasks) return Object.assign({}, DEFAULTS, s);
+      if (s && s.tasks) return normalize(s);
     } catch {}
     // 旧版(todo-calendar-v1)からの移行
     let tasks = [];
@@ -335,11 +328,11 @@
       const old = JSON.parse(localStorage.getItem('todo-calendar-v1'));
       if (Array.isArray(old)) tasks = old.map(t => ({
         id: t.id, title: t.title, date: t.date, start: t.time || '', end: '',
-        importance: 'mid', repeat: t.repeat || 'none', assignee: '',
+        importance: 'mid', repeat: t.repeat || 'none',
         done: !!t.done, completedDates: t.completedDates || []
       }));
     } catch {}
-    return Object.assign({}, DEFAULTS, { tasks });
+    return normalize({ tasks });
   }
   function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
 
@@ -366,16 +359,13 @@
   function tasksOn(ds) {
     return state.tasks
       .filter(t => occursOn(t, ds))
-      .filter(t => !memberFilter || t.assignee === memberFilter)
       .sort((a,b) => (a.start||'99:99').localeCompare(b.start||'99:99'));
   }
   function overdue() {
     const td = todayStr();
     return state.tasks.filter(t => t.repeat==='none' && !t.done && t.date < td)
-      .filter(t => !memberFilter || t.assignee === memberFilter)
       .sort((a,b) => a.date.localeCompare(b.date));
   }
-  const memberOf = id => state.members.find(m => m.id === id);
 
   // ===== 期間ヘルパー =====
   function weekStart(d) { const x = new Date(d); x.setDate(x.getDate() - x.getDay()); return x; }
@@ -404,7 +394,7 @@
 
   // ===== 描画 =====
   function render() {
-    renderCalendar(); renderGoal(); renderForm(); renderMembers(); renderList(); renderReview(); renderOverdue();
+    renderCalendar(); renderGoal(); renderForm(); renderList(); renderReview(); renderOverdue();
   }
 
   // ===== トースト =====
@@ -475,10 +465,8 @@
   function chipFor(t, ds) {
     const c = document.createElement('div');
     c.className = `chip imp-${t.importance}` + (isDone(t,ds) ? ' done' : '');
-    const m = memberOf(t.assignee);
-    if (m) { const dot = document.createElement('i'); dot.className = 'mdot'; dot.style.background = m.color; c.appendChild(dot); }
     c.appendChild(document.createTextNode((t.start ? t.start+' ' : '') + t.title));
-    c.title = t.title + (m ? ` (${m.name})` : '');
+    c.title = t.title;
     return c;
   }
 
@@ -571,8 +559,7 @@
         ev.className = `tg-evt ev-${t.importance}` + (isDone(t,ds) ? ' done' : '');
         ev.style.top = top + 'px'; ev.style.height = height + 'px';
         if (i % 2 === 1) ev.style.left = '8px';
-        const m = memberOf(t.assignee);
-        ev.textContent = `${t.start}${t.end ? '-'+t.end : ''} ${t.title}` + (m ? ` @${m.name}` : '');
+        ev.textContent = `${t.start}${t.end ? '-'+t.end : ''} ${t.title}`;
         ev.title = ev.textContent;
         ev.addEventListener('click', () => startEdit(t, ds));
         col.appendChild(ev);
@@ -593,13 +580,6 @@
 
   // ===== フォーム =====
   function renderForm() {
-    const sel = $('fAssign');
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">未割当</option>';
-    state.members.forEach(m => {
-      const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; sel.appendChild(o);
-    });
-    sel.value = cur && memberOf(cur) ? cur : (editingId ? sel.value : '');
     if (!$('fDate').value) $('fDate').value = selectedDate;
   }
   function startEdit(t, ds) {
@@ -609,7 +589,6 @@
     $('fTitle').value = t.title; $('fDate').value = t.date;
     $('fStart').value = t.start || ''; $('fEnd').value = t.end || '';
     $('fImp').value = t.importance; $('fRep').value = t.repeat;
-    renderForm(); $('fAssign').value = t.assignee || '';
     $('submitBtn').textContent = '更新する';
     $('cancelEdit').style.display = 'block';
     $('fTitle').focus();
@@ -630,8 +609,7 @@
     const data = {
       title, date: $('fDate').value || selectedDate,
       start: $('fStart').value || '', end: $('fEnd').value || '',
-      importance: $('fImp').value, repeat: $('fRep').value,
-      assignee: $('fAssign').value || ''
+      importance: $('fImp').value, repeat: $('fRep').value
     };
     if (data.end && data.start && data.end < data.start) { alert('終了時刻は開始より後にしてください'); return; }
     if (editingId) {
@@ -648,49 +626,6 @@
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && editingId) resetForm(); });
   $('cancelEdit').addEventListener('click', () => { resetForm(); });
-
-  // ===== メンバー =====
-  function renderMembers() {
-    const wrap = $('memberList');
-    wrap.innerHTML = '';
-    const all = document.createElement('div');
-    all.className = 'member-chip' + (memberFilter === null ? ' active' : '');
-    all.textContent = '全員';
-    all.addEventListener('click', () => { memberFilter = null; render(); });
-    wrap.appendChild(all);
-    state.members.forEach(m => {
-      const c = document.createElement('div');
-      c.className = 'member-chip' + (memberFilter === m.id ? ' active' : '');
-      c.innerHTML = `<i class="mdot" style="background:${m.color}"></i>${m.name}`;
-      const rm = document.createElement('span'); rm.className = 'rm'; rm.textContent = '✕';
-      rm.addEventListener('click', e => {
-        e.stopPropagation();
-        if (!confirm(`メンバー「${m.name}」を削除しますか?(タスクは未割当になります)`)) return;
-        state.members = state.members.filter(x => x.id !== m.id);
-        state.tasks.forEach(t => { if (t.assignee === m.id) t.assignee = ''; });
-        if (memberFilter === m.id) memberFilter = null;
-        save(); render();
-      });
-      c.appendChild(rm);
-      c.addEventListener('click', () => { memberFilter = memberFilter === m.id ? null : m.id; render(); });
-      wrap.appendChild(c);
-    });
-    if (!state.members.length) {
-      const e = document.createElement('div'); e.className = 'empty'; e.style.padding = '4px';
-      e.textContent = '家族やグループのメンバーを追加して、タスクに担当者を割り当てられます';
-      wrap.appendChild(e);
-    }
-  }
-  function addMember() {
-    const name = $('memberName').value.trim();
-    if (!name) return;
-    if (state.members.some(m => m.name === name)) { alert('同名のメンバーがいます'); return; }
-    state.members.push({ id: uid(), name, color: COLORS[state.members.length % COLORS.length] });
-    $('memberName').value = '';
-    save(); render();
-  }
-  $('memberAddBtn').addEventListener('click', addMember);
-  $('memberName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addMember(); } });
 
   // ===== リスト =====
   function renderList() {
@@ -728,8 +663,6 @@
     sp.insertAdjacentHTML('beforeend',
       `<span class="tag" style="background:${impBg(t.importance)};color:${impFg(t.importance)}">${IMP_LABEL[t.importance]}</span>` +
       (t.repeat !== 'none' ? `<span class="tag rep">🔁${REP_LABEL[t.repeat]}</span>` : ''));
-    const m = memberOf(t.assignee);
-    if (m) sp.insertAdjacentHTML('beforeend', `<br><span class="assignee"><i class="mdot" style="width:7px;height:7px;border-radius:50%;display:inline-block;background:${m.color}"></i>${esc(m.name)}</span>`);
     const meta = document.createElement('span'); meta.className = 'meta';
     meta.innerHTML = (showDate ? labelOf(ds) + '<br>' : '') + (t.start ? t.start + (t.end ? '-'+t.end : '') : '');
     const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕'; del.title = '削除';
@@ -852,9 +785,9 @@
         const data = JSON.parse(r.result);
         if (!data || !Array.isArray(data.tasks)) throw 0;
         if (!confirm('現在のデータを読み込んだ内容で置き換えます。よろしいですか?')) return;
-        state = Object.assign({}, DEFAULTS, data);
-        save(); resetForm(); render();
-        $('memoArea').value = state.memo.text || '';
+        state = normalize(data);
+        activeMemoId = state.memos[0].id;
+        save(); resetForm(); render(); renderMemo();
         toast('データを読み込みました');
       } catch { alert('読み込めないファイルです'); }
     };
@@ -875,8 +808,7 @@
       const [h, m] = t.start.split(':').map(Number);
       const diff = h*60 + m - nowMin;
       if (diff > 0 && diff <= 60 && !sent[t.id]) {
-        const mm = memberOf(t.assignee);
-        new Notification('⏰ TantoList', { body: `「${t.title}」${mm ? `(担当: ${mm.name})` : ''} は ${t.start} 開始です(あと${diff}分)` });
+        new Notification('⏰ TantoList', { body: `「${t.title}」は ${t.start} 開始です(あと${diff}分)` });
         sent[t.id] = 1;
       }
     });
@@ -902,23 +834,99 @@
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
-  // ===== メモ(自動保存) =====
-  let memoTimer;
-  $('memoArea').value = state.memo.text || '';
-  if (state.memo.updatedAt) {
-    const d = new Date(state.memo.updatedAt);
-    $('memoStatus').textContent = `最終保存: ${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${pad(d.getMinutes())}`;
+  // ===== メモ(タブ式・自動保存) =====
+  let activeMemoId = state.memos[0].id;
+  let memoTimer = null;
+  const fmtDT = ts => { const d = new Date(ts); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${pad(d.getMinutes())}`; };
+  const activeMemo = () => state.memos.find(m => m.id === activeMemoId) || state.memos[0];
+  function flushMemo() {
+    if (!memoTimer) return;
+    clearTimeout(memoTimer); memoTimer = null;
+    const m = activeMemo();
+    m.text = $('memoArea').value; m.updatedAt = Date.now();
+    save();
+  }
+  function renderMemo() {
+    const tabs = $('memoTabs');
+    tabs.innerHTML = '';
+    state.memos.forEach(m => {
+      const tab = document.createElement('div');
+      tab.className = 'memo-tab' + (m.id === activeMemoId ? ' active' : '');
+      const name = document.createElement('span');
+      name.textContent = m.title;
+      tab.appendChild(name);
+      if (m.id === activeMemoId) {
+        const rn = document.createElement('span'); rn.className = 'memo-act'; rn.title = '名前を変更'; rn.textContent = '✎';
+        rn.addEventListener('click', e => { e.stopPropagation(); renameMemo(m, name); });
+        const del = document.createElement('span'); del.className = 'memo-act'; del.title = 'このメモを削除'; del.textContent = '✕';
+        del.addEventListener('click', e => {
+          e.stopPropagation();
+          if (state.memos.length === 1) { alert('最後のメモは削除できません'); return; }
+          if (($('memoArea').value || '').trim() && !confirm(`メモ「${m.title}」を削除しますか?`)) return;
+          clearTimeout(memoTimer); memoTimer = null;
+          state.memos = state.memos.filter(x => x.id !== m.id);
+          activeMemoId = state.memos[0].id;
+          save(); renderMemo();
+          toast('メモを削除しました');
+        });
+        tab.append(rn, del);
+      }
+      tab.addEventListener('click', () => {
+        if (m.id === activeMemoId) return;
+        flushMemo();
+        activeMemoId = m.id;
+        renderMemo();
+      });
+      tab.addEventListener('dblclick', () => { if (m.id === activeMemoId) renameMemo(m, name); });
+      tabs.appendChild(tab);
+    });
+    const add = document.createElement('div');
+    add.className = 'memo-tab add'; add.textContent = '＋'; add.title = '新しいメモを追加';
+    add.addEventListener('click', () => {
+      flushMemo();
+      const m = { id: uid(), title: `メモ${state.memos.length + 1}`, text: '', updatedAt: 0 };
+      state.memos.push(m);
+      activeMemoId = m.id;
+      save(); renderMemo();
+      $('memoArea').focus();
+    });
+    tabs.appendChild(add);
+    const m = activeMemo();
+    $('memoArea').value = m.text || '';
+    $('memoStatus').textContent = m.updatedAt ? `最終保存: ${fmtDT(m.updatedAt)}` : '';
+  }
+  function renameMemo(m, nameEl) {
+    const input = document.createElement('input');
+    input.type = 'text'; input.value = m.title; input.maxLength = 15; input.className = 'memo-rename';
+    nameEl.replaceWith(input);
+    input.focus(); input.select();
+    let done = false;
+    const commit = cancel => {
+      if (done) return; done = true;
+      if (!cancel) { const v = input.value.trim(); if (v) m.title = v; save(); }
+      renderMemo();
+    };
+    input.addEventListener('click', e => e.stopPropagation());
+    input.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') commit(false);
+      if (ev.key === 'Escape') commit(true);
+    });
+    input.addEventListener('blur', () => commit(false));
   }
   $('memoArea').addEventListener('input', () => {
     clearTimeout(memoTimer);
     $('memoStatus').textContent = '入力中…';
     memoTimer = setTimeout(() => {
-      state.memo = { text: $('memoArea').value, updatedAt: Date.now() };
+      memoTimer = null;
+      const m = activeMemo();
+      m.text = $('memoArea').value;
+      m.updatedAt = Date.now();
       save();
-      const d = new Date();
-      $('memoStatus').textContent = `✓ 保存しました ${d.getHours()}:${pad(d.getMinutes())}`;
+      $('memoStatus').textContent = `✓ 保存しました ${fmtDT(m.updatedAt)}`;
     }, 500);
   });
+  window.addEventListener('beforeunload', flushMemo);
+  renderMemo();
 
   $('fDate').value = selectedDate;
   updateNotifyBtn();
