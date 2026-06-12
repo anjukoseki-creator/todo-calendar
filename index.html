@@ -176,6 +176,10 @@
   /* AIプランナー */
   .ai-note { font-size: .68rem; color: var(--muted); line-height: 1.7; }
   .ai-note a { color: var(--accent); }
+  .ai-key-row { display: flex; gap: 6px; }
+  .ai-key-row input { flex: 1; min-width: 0; }
+  .ai-key-ok { display: flex; align-items: center; gap: 8px; font-size: .76rem; color: var(--low); }
+  .ai-key-ok button { background: #eef0f5; color: var(--muted); padding: 4px 10px; }
   .ai-week { border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-top: 10px; }
   .ai-week h4 { font-size: .84rem; margin-bottom: 6px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .ai-week h4 .wk-hours { font-size: .7rem; color: var(--muted); font-weight: normal; }
@@ -265,8 +269,17 @@
           </select>
         </div>
       </div>
+      <div><label>作成エンジン</label>
+        <select id="aiEngine" style="width:100%">
+          <option value="chrome">Chrome内蔵AI(確認中…)</option>
+          <option value="claude">Claude API(高品質・要APIキー)</option>
+          <option value="tpl" selected>テンプレート(AIなし・オフライン)</option>
+        </select>
+      </div>
+      <div id="aiSetup" style="display:none"></div>
       <button type="submit" class="btn-accent" id="aiRun">⚡ プランを作成</button>
     </form>
+    <div id="aiStatus" class="ai-note" style="margin-top:8px"></div>
     <div id="aiResult"></div>
   </section>
 
@@ -985,6 +998,125 @@
     d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
     return fmt(d);
   }
+
+  // ===== AIエンジン =====
+  const AI_KEY = 'tantolist-apikey';   // 書出データに含めないよう別キーで保存
+  const CAT_LABEL = { study: '学習・資格', exercise: '運動・健康', build: '制作・開発', habit: '習慣づくり', general: 'その他' };
+  function buildPrompt(goal, weeks, hours, cat) {
+    return `あなたは優秀な目標達成コーチです。次の目標を週ごとの実行可能なタスクに細分化してください。
+目標: ${goal}
+タイプ: ${CAT_LABEL[cat] || 'その他'}
+期間: ${weeks}週間(必ず${weeks}個の週を出力)
+週に使える時間: ${hours}時間(各週のタスクのhours合計をこの範囲内に収める)
+ルール: タスク1つは0.5〜2時間で、タイトルは具体的な行動(日本語)。後半の週ほど発展的にし、最終週は仕上げと振り返りを含める。
+出力は次のJSONのみ。説明文・コードブロックは一切禁止:
+{"weeks":[{"week":1,"theme":"週のテーマ","tasks":[{"title":"具体的なタスク","hours":1}]}],"advice":"継続のコツ2〜3文"}`;
+  }
+  function parsePlan(text, weeks) {
+    const s = text.indexOf('{'), e = text.lastIndexOf('}');
+    if (s < 0 || e <= s) throw new Error('AIの応答を解析できませんでした');
+    const plan = JSON.parse(text.slice(s, e + 1));
+    if (!Array.isArray(plan.weeks) || !plan.weeks.length) throw new Error('AIの応答形式が不正でした');
+    plan.weeks = plan.weeks.slice(0, weeks).map((w, i) => ({
+      week: i + 1,
+      theme: String(w.theme || ''),
+      tasks: (Array.isArray(w.tasks) ? w.tasks : []).slice(0, 10).map(t => ({
+        title: String(t.title || '').slice(0, 80),
+        hours: Math.max(.5, Math.min(8, Number(t.hours) || 1))
+      })).filter(t => t.title)
+    })).filter(w => w.tasks.length);
+    if (!plan.weeks.length) throw new Error('AIの応答にタスクがありませんでした');
+    plan.advice = String(plan.advice || '').slice(0, 300);
+    return plan;
+  }
+  // Chrome内蔵AI (Prompt API) — 実装バージョン差を吸収
+  async function chromeAIAvail() {
+    try {
+      if (typeof LanguageModel !== 'undefined' && LanguageModel.availability) return await LanguageModel.availability();
+      if (window.ai?.languageModel?.capabilities) {
+        const c = await window.ai.languageModel.capabilities();
+        return c.available === 'readily' ? 'available' : (c.available === 'after-download' ? 'downloadable' : 'unavailable');
+      }
+    } catch {}
+    return 'unavailable';
+  }
+  async function callChromeAI(prompt) {
+    let session;
+    if (typeof LanguageModel !== 'undefined' && LanguageModel.create) session = await LanguageModel.create();
+    else if (window.ai?.languageModel?.create) session = await window.ai.languageModel.create();
+    else throw new Error('この環境ではChrome内蔵AIを利用できません');
+    try { return await session.prompt(prompt); }
+    finally { session.destroy && session.destroy(); }
+  }
+  async function callClaude(prompt) {
+    const key = localStorage.getItem(AI_KEY);
+    if (!key) throw new Error('先にAPIキーを設定してください');
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('APIキーが無効です');
+      if (res.status === 429) throw new Error('API利用上限に達しています');
+      throw new Error(`APIエラー(${res.status})`);
+    }
+    const data = await res.json();
+    return (data.content?.[0]?.text || '').trim();
+  }
+  function renderAiSetup() {
+    const wrap = $('aiSetup');
+    wrap.innerHTML = '';
+    if (localStorage.getItem(AI_KEY)) {
+      const row = document.createElement('div');
+      row.className = 'ai-key-ok';
+      row.appendChild(document.createTextNode('✓ APIキー設定済み'));
+      const chg = document.createElement('button'); chg.type = 'button'; chg.textContent = 'キーを削除';
+      chg.addEventListener('click', () => { localStorage.removeItem(AI_KEY); renderAiSetup(); });
+      row.appendChild(chg);
+      wrap.appendChild(row);
+      return;
+    }
+    const note = document.createElement('p');
+    note.className = 'ai-note';
+    note.innerHTML = 'Anthropic APIキーが必要です(<a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a> で取得、従量課金)。キーは<b>この端末のブラウザ内にのみ</b>保存され、Anthropic API以外には送信されません。「書出」ファイルにも含まれません。';
+    const row = document.createElement('div');
+    row.className = 'ai-key-row';
+    const inp = document.createElement('input');
+    inp.type = 'password'; inp.placeholder = 'sk-ant- で始まるAPIキー'; inp.autocomplete = 'off';
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'btn-accent'; btn.textContent = '保存';
+    btn.addEventListener('click', () => {
+      const v = inp.value.trim();
+      if (!v.startsWith('sk-ant-')) { alert('sk-ant- で始まるAPIキーを入力してください'); return; }
+      localStorage.setItem(AI_KEY, v);
+      renderAiSetup(); toast('APIキーを保存しました');
+    });
+    row.append(inp, btn);
+    wrap.append(note, row);
+  }
+  function updateEngineUI() {
+    $('aiSetup').style.display = $('aiEngine').value === 'claude' ? '' : 'none';
+  }
+  $('aiEngine').addEventListener('change', updateEngineUI);
+  renderAiSetup();
+  (async () => {
+    const avail = await chromeAIAvail();
+    const opt = $('aiEngine').querySelector('option[value="chrome"]');
+    if (avail === 'unavailable') {
+      opt.disabled = true;
+      opt.textContent = 'Chrome内蔵AI(この環境では利用不可)';
+    } else {
+      opt.textContent = avail === 'available' ? 'Chrome内蔵AI(無料・利用可)' : 'Chrome内蔵AI(無料・初回はモデルDL)';
+      $('aiEngine').value = 'chrome';
+    }
+    updateEngineUI();
+  })();
   function renderAiPlan() {
     const saved = state.aiPlan;
     const box = $('aiResult');
@@ -1061,17 +1193,39 @@
     actions.append(lbl, dateInp, reg);
     box.appendChild(actions);
   }
-  $('aiForm').addEventListener('submit', e => {
+  $('aiForm').addEventListener('submit', async e => {
     e.preventDefault();
     const goal = $('aiGoal').value.trim();
     if (!goal) return;
     const weeks = Number($('aiWeeks').value);
     const hoursV = Number($('aiHours').value) || 5;
-    const plan = generatePlan(goal, weeks, hoursV, $('aiCat').value);
-    state.aiPlan = { goal, weeks, hours: hoursV, cat: $('aiCat').value, plan, createdAt: Date.now() };
-    save();
-    renderAiPlan();
-    toast('プランができました');
+    const cat = $('aiCat').value;
+    const engine = $('aiEngine').value;
+    const finish = (plan, usedEngine) => {
+      state.aiPlan = { goal, weeks, hours: hoursV, cat, engine: usedEngine, plan, createdAt: Date.now() };
+      save(); renderAiPlan();
+    };
+    if (engine === 'tpl') {
+      finish(generatePlan(goal, weeks, hoursV, cat), 'tpl');
+      toast('プランができました');
+      return;
+    }
+    $('aiRun').disabled = true;
+    $('aiStatus').textContent = engine === 'chrome'
+      ? '🤖 端末内AIがプランを作成中…(初回はモデルのダウンロードで数分かかることがあります)'
+      : '🤖 AIがプランを作成中…(10〜30秒ほど)';
+    try {
+      const prompt = buildPrompt(goal, weeks, hoursV, cat);
+      const text = engine === 'chrome' ? await callChromeAI(prompt) : await callClaude(prompt);
+      finish(parsePlan(text, weeks), engine);
+      $('aiStatus').textContent = '';
+      toast('AIプランができました');
+    } catch (err) {
+      finish(generatePlan(goal, weeks, hoursV, cat), 'tpl');
+      $('aiStatus').textContent = `⚠️ ${err.message || 'AIエラー'} — 代わりにテンプレートで作成しました`;
+    } finally {
+      $('aiRun').disabled = false;
+    }
   });
   renderAiPlan();
   if (state.aiPlan) {
