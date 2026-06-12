@@ -289,7 +289,8 @@
       <div><label>作成エンジン</label>
         <select id="aiEngine" style="width:100%">
           <option value="chrome">Chrome内蔵AI(確認中…)</option>
-          <option value="claude">Claude API(高品質・要APIキー)</option>
+          <option value="gemini">Gemini API(無料キー・スマホOK)</option>
+          <option value="claude">Claude API(高品質・有料キー)</option>
           <option value="tpl" selected>テンプレート(AIなし・オフライン)</option>
         </select>
       </div>
@@ -1133,6 +1134,27 @@
     try { return await session.prompt(prompt); }
     finally { session.destroy && session.destroy(); }
   }
+  async function callGemini(prompt) {
+    const key = localStorage.getItem(GEMINI_KEY);
+    if (!key) throw new Error('先にGemini APIキーを設定してください');
+    let lastErr = 'Gemini APIエラー';
+    for (const model of ['gemini-2.5-flash', 'gemini-2.0-flash']) {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      if (res.status === 404) { lastErr = `モデル${model}が見つかりません`; continue; }
+      if (res.status === 400 || res.status === 403) throw new Error('Gemini APIキーが無効です');
+      if (res.status === 429) throw new Error('Geminiの無料枠の上限に達しました。少し待ってから再試行してください');
+      if (!res.ok) throw new Error(`Gemini APIエラー(${res.status})`);
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+      if (text.trim()) return text.trim();
+      lastErr = 'Geminiの応答が空でした';
+    }
+    throw new Error(lastErr);
+  }
   async function callClaude(prompt) {
     const key = localStorage.getItem(AI_KEY);
     if (!key) throw new Error('先にAPIキーを設定してください');
@@ -1154,48 +1176,60 @@
     const data = await res.json();
     return (data.content?.[0]?.text || '').trim();
   }
+  const GEMINI_KEY = 'tantolist-gemini-key';
+  const KEY_CONF = {
+    claude: { store: AI_KEY, prefix: 'sk-ant-', label: 'Anthropic APIキー', url: 'https://console.anthropic.com/', urlLabel: 'console.anthropic.com', note: '従量課金' },
+    gemini: { store: GEMINI_KEY, prefix: 'AIza', label: 'Google AI (Gemini) APIキー', url: 'https://aistudio.google.com/apikey', urlLabel: 'aistudio.google.com/apikey', note: '無料枠あり・クレジットカード不要' }
+  };
   function renderAiSetup() {
     const wrap = $('aiSetup');
+    const conf = KEY_CONF[$('aiEngine').value];
     wrap.innerHTML = '';
-    if (localStorage.getItem(AI_KEY)) {
+    if (!conf) return;
+    if (localStorage.getItem(conf.store)) {
       const row = document.createElement('div');
       row.className = 'ai-key-ok';
-      row.appendChild(document.createTextNode('✓ APIキー設定済み'));
+      row.appendChild(document.createTextNode(`✓ ${conf.label}設定済み`));
       const chg = document.createElement('button'); chg.type = 'button'; chg.textContent = 'キーを削除';
-      chg.addEventListener('click', () => { localStorage.removeItem(AI_KEY); renderAiSetup(); });
+      chg.addEventListener('click', () => { localStorage.removeItem(conf.store); renderAiSetup(); });
       row.appendChild(chg);
       wrap.appendChild(row);
       return;
     }
     const note = document.createElement('p');
     note.className = 'ai-note';
-    note.innerHTML = 'Anthropic APIキーが必要です(<a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a> で取得、従量課金)。キーは<b>この端末のブラウザ内にのみ</b>保存され、Anthropic API以外には送信されません。「書出」ファイルにも含まれません。';
+    const a = document.createElement('a');
+    a.href = conf.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = conf.urlLabel;
+    note.append(`${conf.label}が必要です(`, a, ` で取得、${conf.note})。キーはこの端末のブラウザ内にのみ保存され、該当のAPI以外には送信されません。「書出」ファイルにも含まれません。`);
     const row = document.createElement('div');
     row.className = 'ai-key-row';
     const inp = document.createElement('input');
-    inp.type = 'password'; inp.placeholder = 'sk-ant- で始まるAPIキー'; inp.autocomplete = 'off';
+    inp.type = 'password'; inp.placeholder = `${conf.prefix}… で始まるAPIキー`; inp.autocomplete = 'off';
     const btn = document.createElement('button');
     btn.type = 'button'; btn.className = 'btn-accent'; btn.textContent = '保存';
     btn.addEventListener('click', () => {
       const v = inp.value.trim();
-      if (!v.startsWith('sk-ant-')) { alert('sk-ant- で始まるAPIキーを入力してください'); return; }
-      localStorage.setItem(AI_KEY, v);
+      if (!v.startsWith(conf.prefix)) { alert(`${conf.prefix} で始まるAPIキーを入力してください`); return; }
+      localStorage.setItem(conf.store, v);
       renderAiSetup(); toast('APIキーを保存しました');
     });
     row.append(inp, btn);
     wrap.append(note, row);
   }
   function updateEngineUI() {
-    $('aiSetup').style.display = $('aiEngine').value === 'claude' ? '' : 'none';
+    const v = $('aiEngine').value;
+    $('aiSetup').style.display = (v === 'claude' || v === 'gemini') ? '' : 'none';
+    renderAiSetup();
   }
   $('aiEngine').addEventListener('change', updateEngineUI);
-  renderAiSetup();
   (async () => {
     const avail = await chromeAIAvail();
     const opt = $('aiEngine').querySelector('option[value="chrome"]');
     if (avail === 'unavailable') {
       opt.disabled = true;
       opt.textContent = 'Chrome内蔵AI(この環境では利用不可)';
+      // スマホ等ではGeminiを既定に(キー設定済みなら即使える)
+      $('aiEngine').value = localStorage.getItem(GEMINI_KEY) ? 'gemini' : 'tpl';
     } else {
       opt.textContent = avail === 'available' ? 'Chrome内蔵AI(無料・利用可)' : 'Chrome内蔵AI(無料・初回はモデルDL)';
       $('aiEngine').value = 'chrome';
@@ -1338,7 +1372,9 @@
       : '🤖 AIがプランを作成中…(10〜30秒ほど)';
     try {
       const prompt = buildPrompt(goal, weeks, dayHours, cat);
-      const text = engine === 'chrome' ? await callChromeAI(prompt) : await callClaude(prompt);
+      const text = engine === 'chrome' ? await callChromeAI(prompt)
+        : engine === 'gemini' ? await callGemini(prompt)
+        : await callClaude(prompt);
       finish(parsePlan(text, weeks, dayHours), engine);
       $('aiStatus').textContent = '';
       toast('AIプランができました');
