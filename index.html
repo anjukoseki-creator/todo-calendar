@@ -197,8 +197,15 @@
   .ai-week h4 { font-size: .84rem; margin-bottom: 6px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .ai-week h4 .wk-hours { font-size: .7rem; color: var(--muted); font-weight: normal; }
   .ai-week ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-  .ai-week li { font-size: .78rem; display: flex; justify-content: space-between; gap: 8px; background: #f8f9fc; border-radius: 6px; padding: 5px 8px; }
+  .ai-week li { font-size: .78rem; display: flex; align-items: center; gap: 5px; background: #f8f9fc; border-radius: 6px; padding: 4px 6px; }
   .ai-week li .hours { color: var(--muted); flex-shrink: 0; }
+  .pl-day { padding: 4px 2px; font-size: .72rem; flex-shrink: 0; }
+  .pl-title { flex: 1; min-width: 0; padding: 4px 6px; font-size: .74rem; background: transparent; border-color: transparent; }
+  .pl-title:hover, .pl-title:focus { background: #fff; border-color: var(--border); }
+  .pl-hours { width: 3.8em; padding: 4px 2px; font-size: .72rem; text-align: center; flex-shrink: 0; }
+  .pl-del { background: transparent; color: var(--muted); padding: 0 4px; flex-shrink: 0; }
+  .pl-del:hover { color: var(--high); }
+  .pl-add { background: var(--accent-light); color: var(--accent); padding: 5px 12px; font-size: .72rem; margin-top: 8px; }
   .ai-advice { background: var(--accent-light); border-radius: 8px; padding: 8px 10px; font-size: .78rem; margin-top: 10px; line-height: 1.7; }
   .ai-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
   .ai-actions input[type=date] { padding: 7px 9px; }
@@ -258,17 +265,16 @@
     </div>
     <div class="goal-line" id="goalLine">🎯 <span id="goalText" class="goal-text"></span></div>
     <div id="calArea"></div>
-    <div class="legend">
-      <span><i class="lg" style="background:var(--high)"></i>重要度: 高</span>
-      <span><i class="lg" style="background:var(--mid)"></i>中</span>
-      <span><i class="lg" style="background:var(--low)"></i>低</span>
-    </div>
+    <div class="legend" id="legend"></div>
   </section>
 
   <section class="card" id="aiSection" style="display:none">
     <h3>🧠 目標プランナー <span style="font-size:.65rem;color:var(--muted);font-weight:normal">目標を週ごとのスケジュールに自動分解します</span></h3>
     <form class="form" id="aiForm">
       <input type="text" id="aiGoal" placeholder="目標(例: TOEIC 700点を取る)" maxlength="100" required>
+      <div><label>進め方の希望(任意)</label>
+        <textarea id="aiHow" style="width:100%;min-height:54px;resize:vertical" maxlength="300" placeholder="例: 平日はスキマ時間で単語中心、週末に問題演習をまとめて。リスニングを重点的に強化したい 等"></textarea>
+      </div>
       <div class="row">
         <div><label>期間(週)</label><select id="aiWeeks" style="width:100%"></select></div>
         <div><label>タイプ</label>
@@ -307,17 +313,21 @@
       <form class="form" id="taskForm">
         <input type="text" id="fTitle" placeholder="タスク名" maxlength="100" required>
         <div class="row">
-          <div><label>日付</label><input type="date" id="fDate" required style="width:100%"></div>
+          <div><label>開始日</label><input type="date" id="fDate" required style="width:100%"></div>
+          <div><label>終了日(任意)</label><input type="date" id="fEndDate" style="width:100%"></div>
         </div>
         <div class="row">
-          <div><label>開始</label><input type="time" id="fStart" style="width:100%"></div>
-          <div><label>終了</label><input type="time" id="fEnd" style="width:100%"></div>
+          <div><label>開始時刻</label><input type="time" id="fStart" style="width:100%"></div>
+          <div><label>終了時刻</label><input type="time" id="fEnd" style="width:100%"></div>
         </div>
         <div class="row">
+          <div><label>ジャンル</label>
+            <select id="fGenre" style="width:100%"></select>
+          </div>
           <div><label>重要度</label>
             <select id="fImp" style="width:100%">
-              <option value="high">高</option>
-              <option value="mid" selected>中</option>
+              <option value="high">高 ‼</option>
+              <option value="mid" selected>中 ！</option>
               <option value="low">低</option>
             </select>
           </div>
@@ -392,7 +402,19 @@
   const $ = id => document.getElementById(id);
   const YOUBI = ['日','月','火','水','木','金','土'];
   const IMP_LABEL = { high:'高', mid:'中', low:'低' };
+  const IMP_MARK = { high:'‼', mid:'！', low:'' };
   const REP_LABEL = { daily:'毎日', weekly:'毎週', monthly:'毎月' };
+  const GENRES = {
+    none:     { label: 'なし',     color: '#8d93a8' },
+    study:    { label: '勉強',     color: '#3b82d9' },
+    work:     { label: '仕事',     color: '#8e6fd8' },
+    baito:    { label: 'バイト',   color: '#2bb3c0' },
+    circle:   { label: 'サークル', color: '#f0a832' },
+    shukatsu: { label: '就活',     color: '#e85d75' },
+    life:     { label: '生活',     color: '#43a878' }
+  };
+  const genreOf = g => GENRES[g] || GENRES.none;
+  const endOf = t => (t.endDate && t.endDate > t.date) ? t.endDate : t.date;
 
   // ===== 状態 =====
   const DEFAULTS = { tasks: [], comments: [], goals: {}, memos: [] };
@@ -436,7 +458,7 @@
 
   // ===== タスクロジック =====
   function occursOn(t, ds) {
-    if (t.repeat === 'none') return t.date === ds;
+    if (t.repeat === 'none') return ds >= t.date && ds <= endOf(t);
     if (ds < t.date) return false;
     const d = parse(ds), s = parse(t.date);
     if (t.repeat === 'daily') return true;
@@ -461,7 +483,7 @@
   }
   function overdue() {
     const td = todayStr();
-    return state.tasks.filter(t => t.repeat==='none' && !t.done && t.date < td)
+    return state.tasks.filter(t => t.repeat==='none' && !t.done && endOf(t) < td)
       .sort((a,b) => a.date.localeCompare(b.date));
   }
 
@@ -570,9 +592,17 @@
 
   function chipFor(t, ds) {
     const c = document.createElement('div');
-    c.className = `chip imp-${t.importance}` + (isDone(t,ds) ? ' done' : '');
-    c.appendChild(document.createTextNode((t.start ? t.start+' ' : '') + t.title));
-    c.title = t.title;
+    const g = genreOf(t.genre);
+    c.className = 'chip' + (isDone(t,ds) ? ' done' : '');
+    if (!isDone(t, ds)) {
+      c.style.background = g.color + '22';
+      c.style.color = g.color;
+      c.style.borderLeftColor = g.color;
+    }
+    const mark = IMP_MARK[t.importance] || '';
+    const od = !isDone(t, ds) && endOf(t) < todayStr() && t.repeat === 'none' ? '⚠' : '';
+    c.appendChild(document.createTextNode(od + mark + (t.start ? t.start+' ' : '') + t.title));
+    c.title = `${t.title} [${g.label}/${IMP_LABEL[t.importance]}]`;
     return c;
   }
 
@@ -662,10 +692,14 @@
         const top = (sh*60+sm) / 60 * HOUR_H;
         const height = Math.max(((endMin - (sh*60+sm)) / 60) * HOUR_H, 20);
         const ev = document.createElement('div');
-        ev.className = `tg-evt ev-${t.importance}` + (isDone(t,ds) ? ' done' : '');
+        const g = genreOf(t.genre);
+        ev.className = 'tg-evt' + (isDone(t,ds) ? ' done' : '');
+        ev.style.background = g.color + '22';
+        ev.style.color = g.color;
+        ev.style.borderLeftColor = g.color;
         ev.style.top = top + 'px'; ev.style.height = height + 'px';
         if (i % 2 === 1) ev.style.left = '8px';
-        ev.textContent = `${t.start}${t.end ? '-'+t.end : ''} ${t.title}`;
+        ev.textContent = `${IMP_MARK[t.importance] || ''}${t.start}${t.end ? '-'+t.end : ''} ${t.title}`;
         ev.title = ev.textContent;
         ev.addEventListener('click', () => startEdit(t, ds));
         col.appendChild(ev);
@@ -685,6 +719,23 @@
   }
 
   // ===== フォーム =====
+  // ジャンルselect初期化 + 凡例描画
+  Object.entries(GENRES).forEach(([k, g]) => {
+    const o = document.createElement('option'); o.value = k; o.textContent = g.label;
+    $('fGenre').appendChild(o);
+  });
+  (() => {
+    const lg = $('legend');
+    Object.entries(GENRES).forEach(([k, g]) => {
+      if (k === 'none') return;
+      const s = document.createElement('span');
+      s.innerHTML = `<i class="lg" style="background:${g.color}"></i>${g.label}`;
+      lg.appendChild(s);
+    });
+    const imp = document.createElement('span');
+    imp.textContent = '重要度: ‼高 ！中';
+    lg.appendChild(imp);
+  })();
   function renderForm() {
     if (!$('fDate').value) $('fDate').value = selectedDate;
   }
@@ -693,8 +744,10 @@
     selectedDate = ds;
     $('formTitle').textContent = '✏️ タスクを編集';
     $('fTitle').value = t.title; $('fDate').value = t.date;
+    $('fEndDate').value = (t.endDate && t.endDate > t.date) ? t.endDate : '';
     $('fStart').value = t.start || ''; $('fEnd').value = t.end || '';
     $('fImp').value = t.importance; $('fRep').value = t.repeat;
+    $('fGenre').value = t.genre || 'none';
     $('submitBtn').textContent = '更新する';
     $('cancelEdit').style.display = 'block';
     if (isMobile()) $('formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -703,7 +756,8 @@
   function resetForm() {
     editingId = null;
     $('taskForm').reset();
-    $('fImp').value = 'mid'; $('fRep').value = 'none';
+    $('fImp').value = 'mid'; $('fRep').value = 'none'; $('fGenre').value = 'none';
+    $('fEndDate').value = '';
     $('fDate').value = selectedDate;
     $('formTitle').textContent = '➕ タスクを追加';
     $('submitBtn').textContent = '追加する';
@@ -715,10 +769,14 @@
     if (!title) return;
     const data = {
       title, date: $('fDate').value || selectedDate,
+      endDate: $('fEndDate').value || '',
       start: $('fStart').value || '', end: $('fEnd').value || '',
-      importance: $('fImp').value, repeat: $('fRep').value
+      importance: $('fImp').value, repeat: $('fRep').value,
+      genre: $('fGenre').value || 'none'
     };
     if (data.end && data.start && data.end < data.start) { alert('終了時刻は開始より後にしてください'); return; }
+    if (data.endDate && data.endDate < data.date) { alert('終了日は開始日以降にしてください'); return; }
+    if (data.endDate && data.repeat !== 'none') { alert('繰り返しタスクには終了日(複数日)は設定できません'); return; }
     if (editingId) {
       const t = state.tasks.find(x => x.id === editingId);
       if (t) Object.assign(t, data);
@@ -758,7 +816,9 @@
   function labelOf(ds) { const d = parse(ds); return `${d.getMonth()+1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
   function listItem(t, ds, showDate) {
     const li = document.createElement('li');
-    li.className = `todo-item bl-${t.importance}`;
+    li.className = 'todo-item';
+    const g = genreOf(t.genre);
+    li.style.borderLeftColor = g.color;
     const done = isDone(t, ds);
     if (done) li.classList.add('done');
     else if (ds < todayStr()) li.classList.add('overdue');
@@ -768,10 +828,12 @@
     const sp = document.createElement('span'); sp.className = 'title';
     sp.textContent = t.title;
     sp.insertAdjacentHTML('beforeend',
-      `<span class="tag" style="background:${impBg(t.importance)};color:${impFg(t.importance)}">${IMP_LABEL[t.importance]}</span>` +
+      (t.genre && t.genre !== 'none' ? `<span class="tag" style="background:${g.color}22;color:${g.color}">${g.label}</span>` : '') +
+      `<span class="tag" style="background:#f0f1f5;color:#555">${IMP_MARK[t.importance] || ''}${IMP_LABEL[t.importance]}</span>` +
       (t.repeat !== 'none' ? `<span class="tag rep">🔁${REP_LABEL[t.repeat]}</span>` : ''));
     const meta = document.createElement('span'); meta.className = 'meta';
-    meta.innerHTML = (showDate ? labelOf(ds) + '<br>' : '') + (t.start ? t.start + (t.end ? '-'+t.end : '') : '');
+    const range = (t.repeat === 'none' && endOf(t) !== t.date) ? `${labelOf(t.date)}〜${labelOf(endOf(t))}` : (showDate ? labelOf(ds) : '');
+    meta.innerHTML = (range ? range + '<br>' : '') + (t.start ? t.start + (t.end ? '-'+t.end : '') : '');
     const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕'; del.title = '削除';
     del.addEventListener('click', e => {
       e.stopPropagation();
@@ -1079,11 +1141,12 @@
   // ===== AIエンジン =====
   const AI_KEY = 'tantolist-apikey';   // 書出データに含めないよう別キーで保存
   const CAT_LABEL = { study: '学習・資格', exercise: '運動・健康', build: '制作・開発', habit: '習慣づくり', general: 'その他' };
-  function buildPrompt(goal, weeks, dayHours, cat) {
+  function buildPrompt(goal, weeks, dayHours, cat, how) {
     const dayLine = DAY_ORDER.map(d => `${d}:${dayHours[d] || 0}h`).join(' ');
     return `あなたは優秀な目標達成コーチです。次の目標を、曜日ごとの使える時間に合わせた週ごとの実行可能なタスクに細分化してください。
 目標: ${goal}
 タイプ: ${CAT_LABEL[cat] || 'その他'}
+進め方の希望: ${how || '特になし'}(この希望を最優先でプランに反映すること)
 期間: ${weeks}週間(必ず${weeks}個の週を出力)
 曜日ごとに使える時間: ${dayLine}
 ルール:
@@ -1265,16 +1328,37 @@
       const sorted = [...(wk.tasks || [])].sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
       sorted.forEach(t => {
         const li = document.createElement('li');
-        const sp = document.createElement('span');
-        const db = document.createElement('span'); db.className = 'day-badge'; db.textContent = t.day || '-';
-        sp.append(db, document.createTextNode(t.title));
-        const hr = document.createElement('span'); hr.className = 'hours'; hr.textContent = `${t.hours}h`;
-        li.append(sp, hr);
+        const dsel = document.createElement('select'); dsel.className = 'pl-day'; dsel.title = '曜日';
+        DAY_ORDER.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; dsel.appendChild(o); });
+        dsel.value = DAY_ORDER.includes(t.day) ? t.day : '月';
+        dsel.addEventListener('change', () => { t.day = dsel.value; save(); renderAiPlan(); });
+        const ti = document.createElement('input');
+        ti.type = 'text'; ti.className = 'pl-title'; ti.value = t.title; ti.maxLength = 80; ti.title = 'クリックして編集';
+        ti.addEventListener('change', () => { const v = ti.value.trim(); if (v) t.title = v; save(); });
+        const hi = document.createElement('input');
+        hi.type = 'number'; hi.className = 'pl-hours'; hi.min = 0.5; hi.max = 12; hi.step = 0.5; hi.value = t.hours; hi.title = '時間';
+        hi.addEventListener('change', () => { t.hours = Math.max(.5, Math.min(12, Number(hi.value) || 1)); save(); renderAiPlan(); });
+        const del = document.createElement('button');
+        del.type = 'button'; del.className = 'pl-del'; del.textContent = '✕'; del.title = 'このタスクを削除';
+        del.addEventListener('click', () => { wk.tasks = wk.tasks.filter(x => x !== t); save(); renderAiPlan(); });
+        li.append(dsel, ti, hi, del);
         ul.appendChild(li);
       });
       card.appendChild(ul);
+      const addT = document.createElement('button');
+      addT.type = 'button'; addT.className = 'pl-add'; addT.textContent = '＋ タスクを追加';
+      addT.addEventListener('click', () => {
+        wk.tasks.push({ title: '新しいタスク', hours: 1, day: DAY_ORDER[0] });
+        save(); renderAiPlan();
+      });
+      card.appendChild(addT);
       box.appendChild(card);
     });
+    const editNote = document.createElement('p');
+    editNote.className = 'ai-note';
+    editNote.style.marginTop = '6px';
+    editNote.textContent = '✏️ 曜日・タスク名・時間は直接編集できます(自動保存)。✕で削除、＋で追加';
+    box.appendChild(editNote);
     if ((plan.resources || []).length) {
       const res = document.createElement('div');
       res.className = 'ai-res';
@@ -1309,6 +1393,14 @@
     }
     const actions = document.createElement('div');
     actions.className = 'ai-actions';
+    const glbl = document.createElement('span'); glbl.className = 'ai-note'; glbl.textContent = 'ジャンル:';
+    const gsel = document.createElement('select');
+    Object.entries(GENRES).forEach(([k, g]) => {
+      const o = document.createElement('option'); o.value = k; o.textContent = g.label; gsel.appendChild(o);
+    });
+    const CAT2GENRE = { study: 'study', exercise: 'life', build: 'work', habit: 'life', general: 'none' };
+    gsel.value = saved.genre || CAT2GENRE[saved.cat] || 'none';
+    gsel.addEventListener('change', () => { saved.genre = gsel.value; save(); });
     const lbl = document.createElement('span'); lbl.className = 'ai-note'; lbl.textContent = '開始日:';
     const dateInp = document.createElement('input');
     dateInp.type = 'date'; dateInp.value = nextMonday();
@@ -1328,7 +1420,7 @@
           const offset = dayIdx >= 0 ? (dayIdx - weekStart.getDay() + 7) % 7 : Math.min(6, ti);
           const d = new Date(weekStart);
           d.setDate(weekStart.getDate() + offset);
-          state.tasks.push({ id: uid(), title: `${prefix}: ${t.title}`, date: fmt(d), start: '', end: '', importance: 'mid', repeat: 'none', done: false, completedDates: [] });
+          state.tasks.push({ id: uid(), title: `${prefix}: ${t.title}`, date: fmt(d), endDate: '', start: '', end: '', importance: 'mid', repeat: 'none', genre: gsel.value, done: false, completedDates: [] });
           count++;
         });
       });
@@ -1343,7 +1435,7 @@
       render();
       toast(`${count}件のタスクをカレンダーに登録しました`);
     });
-    actions.append(lbl, dateInp, reg);
+    actions.append(glbl, gsel, lbl, dateInp, reg);
     box.appendChild(actions);
   }
   $('aiForm').addEventListener('submit', async e => {
@@ -1355,9 +1447,10 @@
     const total = DAY_ORDER.reduce((a, d) => a + dayHours[d], 0);
     if (total <= 0) { $('aiStatus').textContent = '⚠️ 少なくとも1つの曜日に時間を設定してください'; return; }
     const cat = $('aiCat').value;
+    const how = $('aiHow').value.trim();
     const engine = $('aiEngine').value;
     const finish = (plan, usedEngine) => {
-      state.aiPlan = { goal, weeks, dayHours, cat, engine: usedEngine, plan, createdAt: Date.now() };
+      state.aiPlan = { goal, weeks, dayHours, cat, how, engine: usedEngine, plan, createdAt: Date.now() };
       save(); renderAiPlan();
     };
     if (engine === 'tpl') {
@@ -1371,7 +1464,7 @@
       ? '🤖 端末内AIがプランを作成中…(初回はモデルのダウンロードで数分かかることがあります)'
       : '🤖 AIがプランを作成中…(10〜30秒ほど)';
     try {
-      const prompt = buildPrompt(goal, weeks, dayHours, cat);
+      const prompt = buildPrompt(goal, weeks, dayHours, cat, how);
       const text = engine === 'chrome' ? await callChromeAI(prompt)
         : engine === 'gemini' ? await callGemini(prompt)
         : await callClaude(prompt);
@@ -1389,6 +1482,7 @@
   if (state.aiPlan) {
     $('aiGoal').value = state.aiPlan.goal;
     $('aiWeeks').value = state.aiPlan.weeks;
+    if (state.aiPlan.how) $('aiHow').value = state.aiPlan.how;
     if (state.aiPlan.cat) $('aiCat').value = state.aiPlan.cat;
     if (state.aiPlan.dayHours) {
       document.querySelectorAll('#dayHours input').forEach(i => {
