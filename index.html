@@ -44,32 +44,6 @@
   /* フローティング追加ボタン(モバイル) */
   .fab { display: none; position: fixed; right: 16px; bottom: 16px; width: 54px; height: 54px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 1.7rem; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(59,130,217,.45); z-index: 40; }
 
-  /* ===== モバイル最適化 ===== */
-  @media (max-width: 900px) {
-    main { grid-template-columns: 1fr; margin: 10px auto; padding: 0 8px; gap: 10px; }
-    .card { padding: 10px; border-radius: 12px; }
-    header { padding: 8px 10px; gap: 6px; }
-    header h1 { font-size: .95rem; }
-    header h1 small { display: none; }
-    .btn-ghost { padding: 6px 8px; font-size: .74rem; }
-    .view-switch button { padding: 6px 11px; }
-    .cal-nav h2 { font-size: .95rem; }
-    .calendar td { height: 62px; padding: 2px; }
-    .chip { font-size: .58rem; padding-left: 4px; }
-    .tg-scroll { max-height: 370px; }
-    /* 入力時のiOS自動ズームを防ぐ */
-    input, select, textarea { font-size: 16px; }
-    /* カードの並び: 当日のToDo → 追加フォーム → 振り返り → メモ */
-    #listCard { order: 1; }
-    #formCard { order: 2; }
-    #reviewCard { order: 3; }
-    #memoCard { order: 4; }
-    .todo-item { padding: 10px; }
-    .todo-item input[type=checkbox] { width: 19px; height: 19px; }
-    .memo-tab { padding: 6px 12px; }
-    .fab { display: flex; }
-    #toast { bottom: 84px; max-width: 92vw; }
-  }
   .card { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; }
   .card h3 { font-size: .9rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
   .side { display: flex; flex-direction: column; gap: 14px; }
@@ -198,6 +172,33 @@
   .legend { display: flex; gap: 10px; justify-content: center; font-size: .68rem; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
   .legend span { display: inline-flex; align-items: center; gap: 4px; }
   .lg { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  /* ===== モバイル最適化(末尾に置いて優先) ===== */
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; margin: 10px auto; padding: 0 8px; gap: 10px; }
+    .card { padding: 10px; border-radius: 12px; }
+    header { padding: 8px 10px; gap: 6px; }
+    header h1 { font-size: .95rem; }
+    header h1 small { display: none; }
+    .btn-ghost { padding: 6px 8px; font-size: .74rem; }
+    .view-switch button { padding: 6px 11px; }
+    .cal-nav h2 { font-size: .95rem; }
+    .calendar td { height: 62px; padding: 2px; }
+    .chip { font-size: .58rem; padding-left: 4px; }
+    .tg-scroll { max-height: 370px; }
+    /* 入力時のiOS自動ズームを防ぐ */
+    input, select, textarea { font-size: 16px; }
+    /* カードの並び: 当日のToDo → 追加フォーム → 振り返り → メモ */
+    #listCard { order: 1; }
+    #formCard { order: 2; }
+    #reviewCard { order: 3; }
+    #memoCard { order: 4; }
+    .todo-item { padding: 10px; }
+    .todo-item input[type=checkbox] { width: 19px; height: 19px; }
+    .memo-tab { padding: 6px 12px; }
+    .fab { display: flex; }
+    #toast { bottom: 84px; max-width: 92vw; }
+  }
 </style>
 </head>
 <body>
