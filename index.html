@@ -173,6 +173,19 @@
   .legend span { display: inline-flex; align-items: center; gap: 4px; }
   .lg { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 
+  /* AIプランナー */
+  .ai-note { font-size: .68rem; color: var(--muted); line-height: 1.7; }
+  .ai-note a { color: var(--accent); }
+  .ai-week { border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-top: 10px; }
+  .ai-week h4 { font-size: .84rem; margin-bottom: 6px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .ai-week h4 .wk-hours { font-size: .7rem; color: var(--muted); font-weight: normal; }
+  .ai-week ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+  .ai-week li { font-size: .78rem; display: flex; justify-content: space-between; gap: 8px; background: #f8f9fc; border-radius: 6px; padding: 5px 8px; }
+  .ai-week li .hours { color: var(--muted); flex-shrink: 0; }
+  .ai-advice { background: var(--accent-light); border-radius: 8px; padding: 8px 10px; font-size: .78rem; margin-top: 10px; line-height: 1.7; }
+  .ai-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+  .ai-actions input[type=date] { padding: 7px 9px; }
+
   /* ===== モバイル最適化(末尾に置いて優先) ===== */
   @media (max-width: 900px) {
     main { grid-template-columns: 1fr; margin: 10px auto; padding: 0 8px; gap: 10px; }
@@ -210,6 +223,7 @@
       <button data-view="month" class="active">月</button>
       <button data-view="week">週</button>
       <button data-view="day">日</button>
+      <button data-view="ai">🧠プラン</button>
     </div>
     <button id="todayBtn" class="btn-ghost">今日へ</button>
     <button id="notifyBtn" class="btn-ghost">🔔 通知</button>
@@ -220,7 +234,7 @@
 </header>
 
 <main>
-  <section class="card">
+  <section class="card" id="calSection">
     <div class="cal-nav">
       <h2 id="calTitle"></h2>
       <div class="nav-btns"><button id="prevBtn">‹</button> <button id="nextBtn">›</button></div>
@@ -232,6 +246,28 @@
       <span><i class="lg" style="background:var(--mid)"></i>中</span>
       <span><i class="lg" style="background:var(--low)"></i>低</span>
     </div>
+  </section>
+
+  <section class="card" id="aiSection" style="display:none">
+    <h3>🧠 目標プランナー <span style="font-size:.65rem;color:var(--muted);font-weight:normal">目標を週ごとのスケジュールに自動分解します</span></h3>
+    <form class="form" id="aiForm">
+      <input type="text" id="aiGoal" placeholder="目標(例: TOEIC 700点を取る)" maxlength="100" required>
+      <div class="row">
+        <div><label>期間(週)</label><select id="aiWeeks" style="width:100%"></select></div>
+        <div><label>週に使える時間</label><input type="number" id="aiHours" min="1" max="80" step="0.5" value="5" style="width:100%"></div>
+        <div><label>タイプ</label>
+          <select id="aiCat" style="width:100%">
+            <option value="study">学習・資格</option>
+            <option value="exercise">運動・健康</option>
+            <option value="build">制作・開発</option>
+            <option value="habit">習慣づくり</option>
+            <option value="general">その他</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="btn-accent" id="aiRun">⚡ プランを作成</button>
+    </form>
+    <div id="aiResult"></div>
   </section>
 
   <aside class="side">
@@ -778,13 +814,16 @@
   }
 
   // ===== ナビ =====
+  function setView(v) {
+    viewMode = v;
+    document.querySelectorAll('.view-switch button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+    const ai = v === 'ai';
+    $('calSection').style.display = ai ? 'none' : '';
+    $('aiSection').style.display = ai ? 'block' : 'none';
+    if (!ai) { viewDate = parse(selectedDate); renderCalendar(); renderGoal(); }
+  }
   document.querySelectorAll('.view-switch button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      viewMode = btn.dataset.view;
-      document.querySelectorAll('.view-switch button').forEach(b => b.classList.toggle('active', b === btn));
-      viewDate = parse(selectedDate);
-      renderCalendar();
-    });
+    btn.addEventListener('click', () => setView(btn.dataset.view));
   });
   $('prevBtn').addEventListener('click', () => move(-1));
   $('nextBtn').addEventListener('click', () => move(1));
@@ -868,6 +907,179 @@
   // 日付跨ぎ対応
   let lastDay = todayStr();
   setInterval(() => { if (todayStr() !== lastDay) { lastDay = todayStr(); render(); } }, 60000);
+
+  // ===== 目標プランナー(テンプレート生成・オフライン動作) =====
+  for (let i = 1; i <= 12; i++) {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = `${i}週間`;
+    if (i === 4) o.selected = true;
+    $('aiWeeks').appendChild(o);
+  }
+  const PLAN_TPL = {
+    study: {
+      phases: [
+        { name: '基礎固め', ratio: .3, tasks: ['基礎インプット(教材・動画を進める)', '重要ポイントをノートにまとめる', '基礎の確認テスト', '用語・公式の暗記'] },
+        { name: '演習中心', ratio: .4, tasks: ['問題演習を解く', '間違えた問題の復習', '苦手分野の集中対策', '演習の解き直し'] },
+        { name: '実戦練習', ratio: .2, tasks: ['本番形式で模擬演習', '時間を計って実戦練習', '弱点の最終チェック'] },
+        { name: '総仕上げ', ratio: .1, tasks: ['全範囲の総復習', '要点の最終確認', '本番準備・体調を整える'] }
+      ],
+      advice: '短時間でも毎週続けることが一番の近道です。終わらなかったタスクは翌週の最初に回し、振り返りタブで達成率をチェックしましょう。'
+    },
+    exercise: {
+      phases: [
+        { name: '準備・習慣化', ratio: .25, tasks: ['軽めの運動で体を慣らす', '正しいフォームの確認', 'ストレッチ・柔軟'] },
+        { name: '負荷アップ', ratio: .35, tasks: ['メインの運動(少しきつめ)', '補助トレーニング', '有酸素運動'] },
+        { name: '強化・維持', ratio: .25, tasks: ['メインの運動(目標ペース)', '記録を計測する', '弱い部位の補強'] },
+        { name: '計測・振り返り', ratio: .15, tasks: ['目標の達成度を計測', '軽めの運動+休養', '次の目標を考える'] }
+      ],
+      advice: '休養も計画のうちです。痛みがあるときは無理せず、できた日をカレンダーで可視化してモチベーションを保ちましょう。'
+    },
+    build: {
+      phases: [
+        { name: '構想・調査', ratio: .2, tasks: ['完成イメージ・要件を書き出す', '参考事例や作り方を調べる', '必要な道具・素材を準備'] },
+        { name: '試作', ratio: .3, tasks: ['最小限の試作を作る', '試作の問題点を洗い出す', '作り方を改善する'] },
+        { name: '本制作', ratio: .35, tasks: ['本体の制作を進める', '細部を作り込む', '途中経過を見直す'] },
+        { name: '仕上げ・公開', ratio: .15, tasks: ['最終調整・仕上げ', '完成品の確認・テスト', '公開・発表の準備'] }
+      ],
+      advice: '完璧を目指すより、まず動く試作を早く作るのがコツです。各週の最後に進捗をメモタブに記録しておくと次週がスムーズです。'
+    },
+    habit: {
+      phases: [
+        { name: '小さく始める', ratio: .25, tasks: ['ハードルを下げて実行(5〜10分でOK)', 'いつ・どこでやるか決めて実行', 'できたら記録をつける'] },
+        { name: '定着させる', ratio: .35, tasks: ['決めた時間に実行する', 'サボりそうな日の対策を試す', '実行記録を振り返る'] },
+        { name: '量を増やす', ratio: .25, tasks: ['時間や回数を少し増やして実行', '質を意識して実行', '記録を見て調整'] },
+        { name: '見直し・継続', ratio: .15, tasks: ['1ヶ月の記録を振り返る', '続けやすい形に最適化', '次の期間の計画を立てる'] }
+      ],
+      advice: '「やる気」より「仕組み」が大事です。実行する時間帯を固定し、繰り返し設定(毎日/毎週)も活用しましょう。'
+    },
+    general: {
+      phases: [
+        { name: '調査・計画', ratio: .2, tasks: ['現状とゴールを書き出す', 'やるべきことを調べて洗い出す', '優先順位を決める'] },
+        { name: '実行(前半)', ratio: .35, tasks: ['優先度の高い作業を進める', '作業を進めて記録する', 'つまずきを解消する'] },
+        { name: '実行(後半)', ratio: .3, tasks: ['残りの作業を進める', '進捗を確認して調整', '仕上がりを意識して進める'] },
+        { name: '仕上げ', ratio: .15, tasks: ['最終チェック・仕上げ', '振り返りと記録', '次のステップを決める'] }
+      ],
+      advice: '週の頭にその週のタスクを見直す時間を5分とると、計画倒れをぐっと防げます。'
+    }
+  };
+  function generatePlan(goal, weeks, hours, cat) {
+    const tpl = PLAN_TPL[cat] || PLAN_TPL.general;
+    const chunk = hours <= 3 ? 1 : 1.5;
+    const n = Math.max(2, Math.min(6, Math.round(hours / chunk)));
+    const per = Math.round(hours / n * 10) / 10;
+    const plan = { weeks: [], advice: tpl.advice };
+    for (let w = 1; w <= weeks; w++) {
+      const pos = (w - .5) / weeks;  // 週の中央位置 0..1
+      let acc = 0, phase = tpl.phases[tpl.phases.length - 1];
+      for (const p of tpl.phases) { acc += p.ratio; if (pos <= acc) { phase = p; break; } }
+      const tasks = [];
+      for (let i = 0; i < n; i++) {
+        tasks.push({ title: phase.tasks[(i + w - 1) % phase.tasks.length], hours: per });
+      }
+      plan.weeks.push({ week: w, theme: phase.name, tasks });
+    }
+    return plan;
+  }
+  function nextMonday() {
+    const d = new Date();
+    d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
+    return fmt(d);
+  }
+  function renderAiPlan() {
+    const saved = state.aiPlan;
+    const box = $('aiResult');
+    box.innerHTML = '';
+    if (!saved) return;
+    const { goal, hours, plan } = saved;
+    const head = document.createElement('p');
+    head.className = 'ai-note';
+    head.style.marginTop = '12px';
+    head.textContent = `📌 プラン: ${goal}`;
+    box.appendChild(head);
+    plan.weeks.forEach(wk => {
+      const card = document.createElement('div');
+      card.className = 'ai-week';
+      const h = document.createElement('h4');
+      const total = (wk.tasks || []).reduce((a, t) => a + (Number(t.hours) || 0), 0);
+      const tt = document.createElement('span');
+      tt.textContent = `第${wk.week}週: ${wk.theme || ''}`;
+      const hh = document.createElement('span');
+      hh.className = 'wk-hours';
+      hh.textContent = `計${Math.round(total * 10) / 10}h / 確保${hours}h`;
+      h.append(tt, hh);
+      card.appendChild(h);
+      const ul = document.createElement('ul');
+      (wk.tasks || []).forEach(t => {
+        const li = document.createElement('li');
+        const sp = document.createElement('span'); sp.textContent = t.title;
+        const hr = document.createElement('span'); hr.className = 'hours'; hr.textContent = `${t.hours}h`;
+        li.append(sp, hr);
+        ul.appendChild(li);
+      });
+      card.appendChild(ul);
+      box.appendChild(card);
+    });
+    if (plan.advice) {
+      const ad = document.createElement('div');
+      ad.className = 'ai-advice';
+      ad.textContent = '💡 ' + plan.advice;
+      box.appendChild(ad);
+    }
+    const actions = document.createElement('div');
+    actions.className = 'ai-actions';
+    const lbl = document.createElement('span'); lbl.className = 'ai-note'; lbl.textContent = '開始日:';
+    const dateInp = document.createElement('input');
+    dateInp.type = 'date'; dateInp.value = nextMonday();
+    const reg = document.createElement('button');
+    reg.type = 'button'; reg.className = 'btn-accent'; reg.textContent = '📅 カレンダーに登録';
+    reg.addEventListener('click', () => {
+      if (!dateInp.value) return;
+      if (!confirm('プランの全タスクをカレンダーに登録しますか?')) return;
+      const start = parse(dateInp.value);
+      const prefix = goal.length > 12 ? goal.slice(0, 12) + '…' : goal;
+      let count = 0;
+      plan.weeks.forEach((wk, wi) => {
+        const n = (wk.tasks || []).length || 1;
+        (wk.tasks || []).forEach((t, ti) => {
+          const d = new Date(start);
+          d.setDate(start.getDate() + wi * 7 + Math.min(6, Math.floor(ti * 7 / n)));
+          state.tasks.push({ id: uid(), title: `${prefix}: ${t.title}`, date: fmt(d), start: '', end: '', importance: 'mid', repeat: 'none', done: false, completedDates: [] });
+          count++;
+        });
+      });
+      // 月の目標にも反映(未設定の月のみ)
+      const gk = `${start.getFullYear()}-${pad(start.getMonth() + 1)}`;
+      state.goals = state.goals || {};
+      if (!state.goals[gk]) state.goals[gk] = goal;
+      save();
+      selectedDate = dateInp.value;
+      viewDate = parse(dateInp.value);
+      setView('month');
+      render();
+      toast(`${count}件のタスクをカレンダーに登録しました`);
+    });
+    actions.append(lbl, dateInp, reg);
+    box.appendChild(actions);
+  }
+  $('aiForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const goal = $('aiGoal').value.trim();
+    if (!goal) return;
+    const weeks = Number($('aiWeeks').value);
+    const hoursV = Number($('aiHours').value) || 5;
+    const plan = generatePlan(goal, weeks, hoursV, $('aiCat').value);
+    state.aiPlan = { goal, weeks, hours: hoursV, cat: $('aiCat').value, plan, createdAt: Date.now() };
+    save();
+    renderAiPlan();
+    toast('プランができました');
+  });
+  renderAiPlan();
+  if (state.aiPlan) {
+    $('aiGoal').value = state.aiPlan.goal;
+    $('aiWeeks').value = state.aiPlan.weeks;
+    $('aiHours').value = state.aiPlan.hours;
+    if (state.aiPlan.cat) $('aiCat').value = state.aiPlan.cat;
+  }
 
   // ===== PWA =====
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
