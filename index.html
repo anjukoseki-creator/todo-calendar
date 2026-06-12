@@ -176,6 +176,19 @@
   /* AIプランナー */
   .ai-note { font-size: .68rem; color: var(--muted); line-height: 1.7; }
   .ai-note a { color: var(--accent); }
+  .day-hours { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 2px; }
+  .day-hours .dh { text-align: center; }
+  .day-hours .dh span { display: block; font-size: .64rem; color: var(--muted); margin-bottom: 2px; }
+  .day-hours .dh span.sat { color: var(--accent); } .day-hours .dh span.sun { color: var(--high); }
+  .day-hours input { width: 100%; padding: 6px 2px; text-align: center; }
+  .day-badge { display: inline-block; min-width: 1.5em; text-align: center; background: var(--accent-light); color: var(--accent); border-radius: 4px; font-size: .66rem; padding: 1px 3px; margin-right: 5px; flex-shrink: 0; }
+  .ai-res { margin-top: 10px; border: 1px dashed var(--border); border-radius: 10px; padding: 10px; }
+  .ai-res h4 { font-size: .8rem; margin-bottom: 6px; }
+  .ai-res ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+  .ai-res li { font-size: .76rem; line-height: 1.5; }
+  .ai-res a { color: var(--accent); font-weight: bold; text-decoration: none; }
+  .ai-res a:hover { text-decoration: underline; }
+  .ai-res .res-desc { color: var(--muted); }
   .ai-key-row { display: flex; gap: 6px; }
   .ai-key-row input { flex: 1; min-width: 0; }
   .ai-key-ok { display: flex; align-items: center; gap: 8px; font-size: .76rem; color: var(--low); }
@@ -258,7 +271,6 @@
       <input type="text" id="aiGoal" placeholder="目標(例: TOEIC 700点を取る)" maxlength="100" required>
       <div class="row">
         <div><label>期間(週)</label><select id="aiWeeks" style="width:100%"></select></div>
-        <div><label>週に使える時間</label><input type="number" id="aiHours" min="1" max="80" step="0.5" value="5" style="width:100%"></div>
         <div><label>タイプ</label>
           <select id="aiCat" style="width:100%">
             <option value="study">学習・資格</option>
@@ -268,6 +280,11 @@
             <option value="general">その他</option>
           </select>
         </div>
+      </div>
+      <div>
+        <label>曜日ごとに使える時間(時間/日)</label>
+        <div class="day-hours" id="dayHours"></div>
+        <div class="ai-note" id="dayTotal" style="text-align:right"></div>
       </div>
       <div><label>作成エンジン</label>
         <select id="aiEngine" style="width:100%">
@@ -928,6 +945,39 @@
     if (i === 4) o.selected = true;
     $('aiWeeks').appendChild(o);
   }
+  // 曜日ごとの時間入力(月〜日)
+  const DAY_ORDER = ['月', '火', '水', '木', '金', '土', '日'];
+  const DAY_DEFAULT = { 月: 0.5, 火: 0.5, 水: 0.5, 木: 0.5, 金: 0.5, 土: 1.5, 日: 1.5 };
+  function buildDayInputs() {
+    const wrap = $('dayHours');
+    wrap.innerHTML = '';
+    DAY_ORDER.forEach(d => {
+      const cell = document.createElement('div');
+      cell.className = 'dh';
+      const lb = document.createElement('span');
+      lb.textContent = d;
+      if (d === '土') lb.classList.add('sat');
+      if (d === '日') lb.classList.add('sun');
+      const inp = document.createElement('input');
+      inp.type = 'number'; inp.min = 0; inp.max = 16; inp.step = 0.5;
+      inp.value = DAY_DEFAULT[d]; inp.dataset.day = d;
+      inp.addEventListener('input', updateDayTotal);
+      cell.append(lb, inp);
+      wrap.appendChild(cell);
+    });
+    updateDayTotal();
+  }
+  function getDayHours() {
+    const dh = {};
+    document.querySelectorAll('#dayHours input').forEach(i => { dh[i.dataset.day] = Math.max(0, Number(i.value) || 0); });
+    return dh;
+  }
+  function updateDayTotal() {
+    const dh = getDayHours();
+    const total = DAY_ORDER.reduce((a, d) => a + dh[d], 0);
+    $('dayTotal').textContent = `週合計: ${Math.round(total * 10) / 10}時間`;
+  }
+  buildDayInputs();
   const PLAN_TPL = {
     study: {
       phases: [
@@ -936,7 +986,12 @@
         { name: '実戦練習', ratio: .2, tasks: ['本番形式で模擬演習', '時間を計って実戦練習', '弱点の最終チェック'] },
         { name: '総仕上げ', ratio: .1, tasks: ['全範囲の総復習', '要点の最終確認', '本番準備・体調を整える'] }
       ],
-      advice: '短時間でも毎週続けることが一番の近道です。終わらなかったタスクは翌週の最初に回し、振り返りタブで達成率をチェックしましょう。'
+      advice: '短時間でも毎週続けることが一番の近道です。終わらなかったタスクは翌週の最初に回し、振り返りタブで達成率をチェックしましょう。',
+      res: [
+        { name: '公式問題集・過去問', desc: '出題形式に慣れる演習の軸' },
+        { name: '単語・暗記アプリ', desc: 'スキマ時間の反復学習' },
+        { name: '解説動画・学習サイト', desc: 'つまずいた分野の理解補強' }
+      ]
     },
     exercise: {
       phases: [
@@ -945,7 +1000,12 @@
         { name: '強化・維持', ratio: .25, tasks: ['メインの運動(目標ペース)', '記録を計測する', '弱い部位の補強'] },
         { name: '計測・振り返り', ratio: .15, tasks: ['目標の達成度を計測', '軽めの運動+休養', '次の目標を考える'] }
       ],
-      advice: '休養も計画のうちです。痛みがあるときは無理せず、できた日をカレンダーで可視化してモチベーションを保ちましょう。'
+      advice: '休養も計画のうちです。痛みがあるときは無理せず、できた日をカレンダーで可視化してモチベーションを保ちましょう。',
+      res: [
+        { name: 'フォーム解説動画', desc: '正しい動きをケガなく習得' },
+        { name: '記録・計測アプリ', desc: '回数や距離の見える化' },
+        { name: 'ストレッチガイド', desc: '運動前後のケア' }
+      ]
     },
     build: {
       phases: [
@@ -954,7 +1014,12 @@
         { name: '本制作', ratio: .35, tasks: ['本体の制作を進める', '細部を作り込む', '途中経過を見直す'] },
         { name: '仕上げ・公開', ratio: .15, tasks: ['最終調整・仕上げ', '完成品の確認・テスト', '公開・発表の準備'] }
       ],
-      advice: '完璧を目指すより、まず動く試作を早く作るのがコツです。各週の最後に進捗をメモタブに記録しておくと次週がスムーズです。'
+      advice: '完璧を目指すより、まず動く試作を早く作るのがコツです。各週の最後に進捗をメモタブに記録しておくと次週がスムーズです。',
+      res: [
+        { name: '公式ドキュメント・チュートリアル', desc: '基本の作り方を正確に押さえる' },
+        { name: '参考作品・事例集', desc: '完成イメージの具体化' },
+        { name: '質問・コミュニティサイト', desc: 'つまずきの解決' }
+      ]
     },
     habit: {
       phases: [
@@ -963,7 +1028,11 @@
         { name: '量を増やす', ratio: .25, tasks: ['時間や回数を少し増やして実行', '質を意識して実行', '記録を見て調整'] },
         { name: '見直し・継続', ratio: .15, tasks: ['1ヶ月の記録を振り返る', '続けやすい形に最適化', '次の期間の計画を立てる'] }
       ],
-      advice: '「やる気」より「仕組み」が大事です。実行する時間帯を固定し、繰り返し設定(毎日/毎週)も活用しましょう。'
+      advice: '「やる気」より「仕組み」が大事です。実行する時間帯を固定し、繰り返し設定(毎日/毎週)も活用しましょう。',
+      res: [
+        { name: '習慣トラッカーアプリ', desc: '連続記録でモチベ維持' },
+        { name: '習慣化の入門書', desc: '続ける仕組みづくりの理論' }
+      ]
     },
     general: {
       phases: [
@@ -972,23 +1041,30 @@
         { name: '実行(後半)', ratio: .3, tasks: ['残りの作業を進める', '進捗を確認して調整', '仕上がりを意識して進める'] },
         { name: '仕上げ', ratio: .15, tasks: ['最終チェック・仕上げ', '振り返りと記録', '次のステップを決める'] }
       ],
-      advice: '週の頭にその週のタスクを見直す時間を5分とると、計画倒れをぐっと防げます。'
+      advice: '週の頭にその週のタスクを見直す時間を5分とると、計画倒れをぐっと防げます。',
+      res: [
+        { name: '入門書・解説サイト', desc: '全体像の把握' },
+        { name: '体験談・事例', desc: '現実的な進め方の参考' }
+      ]
     }
   };
-  function generatePlan(goal, weeks, hours, cat) {
+  function generatePlan(goal, weeks, dayHours, cat) {
     const tpl = PLAN_TPL[cat] || PLAN_TPL.general;
-    const chunk = hours <= 3 ? 1 : 1.5;
-    const n = Math.max(2, Math.min(6, Math.round(hours / chunk)));
-    const per = Math.round(hours / n * 10) / 10;
-    const plan = { weeks: [], advice: tpl.advice };
+    const plan = { weeks: [], advice: tpl.advice, resources: tpl.res || [] };
     for (let w = 1; w <= weeks; w++) {
       const pos = (w - .5) / weeks;  // 週の中央位置 0..1
       let acc = 0, phase = tpl.phases[tpl.phases.length - 1];
       for (const p of tpl.phases) { acc += p.ratio; if (pos <= acc) { phase = p; break; } }
       const tasks = [];
-      for (let i = 0; i < n; i++) {
-        tasks.push({ title: phase.tasks[(i + w - 1) % phase.tasks.length], hours: per });
-      }
+      let k = w - 1;
+      DAY_ORDER.forEach(d => {
+        let h = dayHours[d] || 0;
+        while (h > 0) {
+          const use = Math.min(2, h);
+          tasks.push({ title: phase.tasks[k++ % phase.tasks.length], hours: Math.round(use * 10) / 10, day: d });
+          h -= use;
+        }
+      });
       plan.weeks.push({ week: w, theme: phase.name, tasks });
     }
     return plan;
@@ -1002,31 +1078,40 @@
   // ===== AIエンジン =====
   const AI_KEY = 'tantolist-apikey';   // 書出データに含めないよう別キーで保存
   const CAT_LABEL = { study: '学習・資格', exercise: '運動・健康', build: '制作・開発', habit: '習慣づくり', general: 'その他' };
-  function buildPrompt(goal, weeks, hours, cat) {
-    return `あなたは優秀な目標達成コーチです。次の目標を週ごとの実行可能なタスクに細分化してください。
+  function buildPrompt(goal, weeks, dayHours, cat) {
+    const dayLine = DAY_ORDER.map(d => `${d}:${dayHours[d] || 0}h`).join(' ');
+    return `あなたは優秀な目標達成コーチです。次の目標を、曜日ごとの使える時間に合わせた週ごとの実行可能なタスクに細分化してください。
 目標: ${goal}
 タイプ: ${CAT_LABEL[cat] || 'その他'}
 期間: ${weeks}週間(必ず${weeks}個の週を出力)
-週に使える時間: ${hours}時間(各週のタスクのhours合計をこの範囲内に収める)
-ルール: タスク1つは0.5〜2時間で、タイトルは具体的な行動(日本語)。後半の週ほど発展的にし、最終週は仕上げと振り返りを含める。
+曜日ごとに使える時間: ${dayLine}
+ルール:
+- 各タスクに必ず "day"(月/火/水/木/金/土/日)を付け、その曜日の使える時間内にhoursを収める。0hの曜日にはタスクを入れない
+- タスクのタイトルは具体的な行動(日本語)。後半の週ほど発展的にし、最終週は仕上げと振り返りを含める
+- "resources"には目標達成の参考になる定番の教材・サイト・道具を3〜5個。実在が確実な定番のみを挙げ、URLは書かない
 出力は次のJSONのみ。説明文・コードブロックは一切禁止:
-{"weeks":[{"week":1,"theme":"週のテーマ","tasks":[{"title":"具体的なタスク","hours":1}]}],"advice":"継続のコツ2〜3文"}`;
+{"weeks":[{"week":1,"theme":"週のテーマ","tasks":[{"title":"具体的なタスク","hours":1,"day":"月"}]}],"resources":[{"name":"教材・サイト名","desc":"何に使うか一言"}],"advice":"継続のコツ2〜3文"}`;
   }
-  function parsePlan(text, weeks) {
+  function parsePlan(text, weeks, dayHours) {
     const s = text.indexOf('{'), e = text.lastIndexOf('}');
     if (s < 0 || e <= s) throw new Error('AIの応答を解析できませんでした');
     const plan = JSON.parse(text.slice(s, e + 1));
     if (!Array.isArray(plan.weeks) || !plan.weeks.length) throw new Error('AIの応答形式が不正でした');
+    const okDays = DAY_ORDER.filter(d => (dayHours[d] || 0) > 0);
     plan.weeks = plan.weeks.slice(0, weeks).map((w, i) => ({
       week: i + 1,
       theme: String(w.theme || ''),
-      tasks: (Array.isArray(w.tasks) ? w.tasks : []).slice(0, 10).map(t => ({
+      tasks: (Array.isArray(w.tasks) ? w.tasks : []).slice(0, 14).map((t, ti) => ({
         title: String(t.title || '').slice(0, 80),
-        hours: Math.max(.5, Math.min(8, Number(t.hours) || 1))
+        hours: Math.max(.5, Math.min(8, Number(t.hours) || 1)),
+        day: DAY_ORDER.includes(t.day) ? t.day : okDays[ti % Math.max(okDays.length, 1)] || '月'
       })).filter(t => t.title)
     })).filter(w => w.tasks.length);
     if (!plan.weeks.length) throw new Error('AIの応答にタスクがありませんでした');
     plan.advice = String(plan.advice || '').slice(0, 300);
+    plan.resources = (Array.isArray(plan.resources) ? plan.resources : []).slice(0, 6)
+      .map(r => ({ name: String(r.name || '').slice(0, 50), desc: String(r.desc || '').slice(0, 80) }))
+      .filter(r => r.name);
     return plan;
   }
   // Chrome内蔵AI (Prompt API) — 実装バージョン差を吸収
@@ -1122,7 +1207,9 @@
     const box = $('aiResult');
     box.innerHTML = '';
     if (!saved) return;
-    const { goal, hours, plan } = saved;
+    const { goal, plan } = saved;
+    const dh = saved.dayHours || {};
+    const weeklyTotal = Math.round(DAY_ORDER.reduce((a, d) => a + (dh[d] || 0), 0) * 10) / 10;
     const head = document.createElement('p');
     head.className = 'ai-note';
     head.style.marginTop = '12px';
@@ -1137,13 +1224,16 @@
       tt.textContent = `第${wk.week}週: ${wk.theme || ''}`;
       const hh = document.createElement('span');
       hh.className = 'wk-hours';
-      hh.textContent = `計${Math.round(total * 10) / 10}h / 確保${hours}h`;
+      hh.textContent = `計${Math.round(total * 10) / 10}h / 確保${weeklyTotal}h`;
       h.append(tt, hh);
       card.appendChild(h);
       const ul = document.createElement('ul');
-      (wk.tasks || []).forEach(t => {
+      const sorted = [...(wk.tasks || [])].sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
+      sorted.forEach(t => {
         const li = document.createElement('li');
-        const sp = document.createElement('span'); sp.textContent = t.title;
+        const sp = document.createElement('span');
+        const db = document.createElement('span'); db.className = 'day-badge'; db.textContent = t.day || '-';
+        sp.append(db, document.createTextNode(t.title));
         const hr = document.createElement('span'); hr.className = 'hours'; hr.textContent = `${t.hours}h`;
         li.append(sp, hr);
         ul.appendChild(li);
@@ -1151,6 +1241,32 @@
       card.appendChild(ul);
       box.appendChild(card);
     });
+    if ((plan.resources || []).length) {
+      const res = document.createElement('div');
+      res.className = 'ai-res';
+      const rh = document.createElement('h4'); rh.textContent = '📚 参考リソース(ソース)';
+      res.appendChild(rh);
+      const rul = document.createElement('ul');
+      plan.resources.forEach(r => {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = 'https://www.google.com/search?q=' + encodeURIComponent(`${goal} ${r.name}`);
+        a.target = '_blank'; a.rel = 'noopener noreferrer';
+        a.textContent = r.name + ' 🔎';
+        li.appendChild(a);
+        if (r.desc) {
+          const d = document.createElement('span'); d.className = 'res-desc'; d.textContent = ' — ' + r.desc;
+          li.appendChild(d);
+        }
+        rul.appendChild(li);
+      });
+      res.appendChild(rul);
+      const note = document.createElement('p');
+      note.className = 'ai-note';
+      note.textContent = '※ リソース名はAI生成のため、リンク先の検索結果で実在と内容をご確認ください';
+      res.appendChild(note);
+      box.appendChild(res);
+    }
     if (plan.advice) {
       const ad = document.createElement('div');
       ad.className = 'ai-advice';
@@ -1171,10 +1287,13 @@
       const prefix = goal.length > 12 ? goal.slice(0, 12) + '…' : goal;
       let count = 0;
       plan.weeks.forEach((wk, wi) => {
-        const n = (wk.tasks || []).length || 1;
         (wk.tasks || []).forEach((t, ti) => {
-          const d = new Date(start);
-          d.setDate(start.getDate() + wi * 7 + Math.min(6, Math.floor(ti * 7 / n)));
+          const weekStart = new Date(start);
+          weekStart.setDate(start.getDate() + wi * 7);
+          const dayIdx = YOUBI.indexOf(t.day);
+          const offset = dayIdx >= 0 ? (dayIdx - weekStart.getDay() + 7) % 7 : Math.min(6, ti);
+          const d = new Date(weekStart);
+          d.setDate(weekStart.getDate() + offset);
           state.tasks.push({ id: uid(), title: `${prefix}: ${t.title}`, date: fmt(d), start: '', end: '', importance: 'mid', repeat: 'none', done: false, completedDates: [] });
           count++;
         });
@@ -1198,15 +1317,18 @@
     const goal = $('aiGoal').value.trim();
     if (!goal) return;
     const weeks = Number($('aiWeeks').value);
-    const hoursV = Number($('aiHours').value) || 5;
+    const dayHours = getDayHours();
+    const total = DAY_ORDER.reduce((a, d) => a + dayHours[d], 0);
+    if (total <= 0) { $('aiStatus').textContent = '⚠️ 少なくとも1つの曜日に時間を設定してください'; return; }
     const cat = $('aiCat').value;
     const engine = $('aiEngine').value;
     const finish = (plan, usedEngine) => {
-      state.aiPlan = { goal, weeks, hours: hoursV, cat, engine: usedEngine, plan, createdAt: Date.now() };
+      state.aiPlan = { goal, weeks, dayHours, cat, engine: usedEngine, plan, createdAt: Date.now() };
       save(); renderAiPlan();
     };
     if (engine === 'tpl') {
-      finish(generatePlan(goal, weeks, hoursV, cat), 'tpl');
+      finish(generatePlan(goal, weeks, dayHours, cat), 'tpl');
+      $('aiStatus').textContent = '';
       toast('プランができました');
       return;
     }
@@ -1215,13 +1337,13 @@
       ? '🤖 端末内AIがプランを作成中…(初回はモデルのダウンロードで数分かかることがあります)'
       : '🤖 AIがプランを作成中…(10〜30秒ほど)';
     try {
-      const prompt = buildPrompt(goal, weeks, hoursV, cat);
+      const prompt = buildPrompt(goal, weeks, dayHours, cat);
       const text = engine === 'chrome' ? await callChromeAI(prompt) : await callClaude(prompt);
-      finish(parsePlan(text, weeks), engine);
+      finish(parsePlan(text, weeks, dayHours), engine);
       $('aiStatus').textContent = '';
       toast('AIプランができました');
     } catch (err) {
-      finish(generatePlan(goal, weeks, hoursV, cat), 'tpl');
+      finish(generatePlan(goal, weeks, dayHours, cat), 'tpl');
       $('aiStatus').textContent = `⚠️ ${err.message || 'AIエラー'} — 代わりにテンプレートで作成しました`;
     } finally {
       $('aiRun').disabled = false;
@@ -1231,8 +1353,13 @@
   if (state.aiPlan) {
     $('aiGoal').value = state.aiPlan.goal;
     $('aiWeeks').value = state.aiPlan.weeks;
-    $('aiHours').value = state.aiPlan.hours;
     if (state.aiPlan.cat) $('aiCat').value = state.aiPlan.cat;
+    if (state.aiPlan.dayHours) {
+      document.querySelectorAll('#dayHours input').forEach(i => {
+        if (state.aiPlan.dayHours[i.dataset.day] != null) i.value = state.aiPlan.dayHours[i.dataset.day];
+      });
+      updateDayTotal();
+    }
   }
 
   // ===== PWA =====
