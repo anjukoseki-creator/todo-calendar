@@ -40,7 +40,36 @@
   .overdue-badge { background: var(--high); color: #fff; border-radius: 999px; padding: 4px 10px; font-size: .72rem; display: none; }
 
   main { max-width: 1200px; margin: 16px auto; padding: 0 14px; display: grid; grid-template-columns: 1fr 330px; gap: 14px; align-items: start; }
-  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+  /* フローティング追加ボタン(モバイル) */
+  .fab { display: none; position: fixed; right: 16px; bottom: 16px; width: 54px; height: 54px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 1.7rem; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(59,130,217,.45); z-index: 40; }
+
+  /* ===== モバイル最適化 ===== */
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; margin: 10px auto; padding: 0 8px; gap: 10px; }
+    .card { padding: 10px; border-radius: 12px; }
+    header { padding: 8px 10px; gap: 6px; }
+    header h1 { font-size: .95rem; }
+    header h1 small { display: none; }
+    .btn-ghost { padding: 6px 8px; font-size: .74rem; }
+    .view-switch button { padding: 6px 11px; }
+    .cal-nav h2 { font-size: .95rem; }
+    .calendar td { height: 62px; padding: 2px; }
+    .chip { font-size: .58rem; padding-left: 4px; }
+    .tg-scroll { max-height: 370px; }
+    /* 入力時のiOS自動ズームを防ぐ */
+    input, select, textarea { font-size: 16px; }
+    /* カードの並び: 当日のToDo → 追加フォーム → 振り返り → メモ */
+    #listCard { order: 1; }
+    #formCard { order: 2; }
+    #reviewCard { order: 3; }
+    #memoCard { order: 4; }
+    .todo-item { padding: 10px; }
+    .todo-item input[type=checkbox] { width: 19px; height: 19px; }
+    .memo-tab { padding: 6px 12px; }
+    .fab { display: flex; }
+    #toast { bottom: 84px; max-width: 92vw; }
+  }
   .card { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; }
   .card h3 { font-size: .9rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
   .side { display: flex; flex-direction: column; gap: 14px; }
@@ -205,7 +234,7 @@
   </section>
 
   <aside class="side">
-    <div class="card">
+    <div class="card" id="formCard">
       <h3 id="formTitle">➕ タスクを追加</h3>
       <form class="form" id="taskForm">
         <input type="text" id="fTitle" placeholder="タスク名" maxlength="100" required>
@@ -240,7 +269,7 @@
       </form>
     </div>
 
-    <div class="card">
+    <div class="card" id="listCard">
       <h3>📋 <span id="listTitle"></span></h3>
       <div class="seg" id="rangeSeg">
         <button data-range="day" class="active">日次</button>
@@ -250,7 +279,7 @@
       <ul class="todo-list" id="todoList"></ul>
     </div>
 
-    <div class="card">
+    <div class="card" id="reviewCard">
       <h3>📈 振り返り</h3>
       <div class="seg" id="reviewSeg">
         <button data-rv="week" class="active">週次</button>
@@ -267,7 +296,7 @@
       <ul class="review-history" id="reviewHistory"></ul>
     </div>
 
-    <div class="card">
+    <div class="card" id="memoCard">
       <h3>📝 メモ</h3>
       <div class="memo-tabs" id="memoTabs"></div>
       <textarea id="memoArea" class="memo-area" placeholder="買い物リスト、アイデア、連絡事項など自由にどうぞ(自動保存)"></textarea>
@@ -276,6 +305,7 @@
   </aside>
 </main>
 
+<button class="fab" id="fabAdd" title="タスクを追加">＋</button>
 <div id="toast"></div>
 
 <footer>
@@ -397,6 +427,14 @@
     renderCalendar(); renderGoal(); renderForm(); renderList(); renderReview(); renderOverdue();
   }
 
+  // ===== モバイル補助 =====
+  const isMobile = () => window.matchMedia('(max-width: 900px)').matches;
+  function scrollToList() { if (isMobile()) $('listCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  $('fabAdd').addEventListener('click', () => {
+    $('formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => $('fTitle').focus(), 350);
+  });
+
   // ===== トースト =====
   let toastTimer;
   function toast(msg, undoFn) {
@@ -495,7 +533,7 @@
           if (list.length > 3) { const mo = document.createElement('div'); mo.className='chip more'; mo.textContent = `+${list.length-3}件`; wrap.appendChild(mo); }
           td.appendChild(wrap);
         }
-        td.addEventListener('click', () => { selectedDate = ds; $('fDate').value = ds; render(); });
+        td.addEventListener('click', () => { selectedDate = ds; $('fDate').value = ds; render(); scrollToList(); });
         tr.appendChild(td);
         cur.setDate(cur.getDate()+1);
       }
@@ -519,7 +557,7 @@
       const c = document.createElement('div');
       c.className = 'tg-day' + (ds===td0?' today':'') + (ds===selectedDate?' selected':'');
       c.innerHTML = `${YOUBI[d.getDay()]}<div class="dn">${d.getDate()}</div>`;
-      c.addEventListener('click', () => { selectedDate = ds; $('fDate').value = ds; render(); });
+      c.addEventListener('click', () => { selectedDate = ds; $('fDate').value = ds; render(); scrollToList(); });
       head.appendChild(c);
     });
     wrap.appendChild(head);
@@ -591,6 +629,7 @@
     $('fImp').value = t.importance; $('fRep').value = t.repeat;
     $('submitBtn').textContent = '更新する';
     $('cancelEdit').style.display = 'block';
+    if (isMobile()) $('formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
     $('fTitle').focus();
   }
   function resetForm() {
